@@ -8,8 +8,7 @@ import INITIAL_TOURNAMENT from './seed.js';
  */
 
 const TOURNAMENT_KEY = 'tournament';
-const SESSION_PREFIX = 'session:';
-const SESSION_TTL_HOURS = 24;
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -202,34 +201,75 @@ function extractBearer(request) {
   return (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
 }
 
-function createToken() {
+function createNonce() {
   const bytes = new Uint8Array(24);
   crypto.getRandomValues(bytes);
   return [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-async function pruneSessions(env) {
-  const db = await ensureSchema(env);
-  await db.prepare(`
-    DELETE FROM kv
-    WHERE key LIKE ?
-      AND updated_at < datetime('now', ?)
-  `).bind(`${SESSION_PREFIX}%`, `-${SESSION_TTL_HOURS} hours`).run();
+function base64UrlEncode(text) {
+  const bytes = new TextEncoder().encode(text);
+  let binary = '';
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function base64UrlDecode(text) {
+  const padded = text.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (text.length % 4)) % 4);
+  const binary = atob(padded);
+  const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+function sessionSecret(env) {
+  return `match-schedule-admin:${env.ADMIN_PASSWORD || 'rocket2026'}`;
+}
+
+async function signText(text, secret) {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(text));
+  let binary = '';
+  for (const b of new Uint8Array(signature)) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 
 async function createSession(env) {
-  await pruneSessions(env);
-  const token = createToken();
-  await putKV(env, `${SESSION_PREFIX}${token}`, { createdAt: Date.now() });
-  return token;
+  // Stateless signed token. This avoids a common failure mode where the correct
+  // password succeeds but login still fails because D1 session writes are not yet
+  // configured. Match data still uses D1; auth tokens are verified by signature.
+  const now = Date.now();
+  const payload = {
+    iat: now,
+    exp: now + SESSION_TTL_MS,
+    nonce: createNonce()
+  };
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+  const signature = await signText(encodedPayload, sessionSecret(env));
+  return `${encodedPayload}.${signature}`;
 }
 
 async function requireAdmin(request, env) {
   const token = extractBearer(request);
   if (!token) return false;
-  await pruneSessions(env);
-  const session = await getKV(env, `${SESSION_PREFIX}${token}`);
-  return Boolean(session);
+
+  const [encodedPayload, signature] = token.split('.');
+  if (!encodedPayload || !signature) return false;
+
+  const expected = await signText(encodedPayload, sessionSecret(env));
+  if (signature !== expected) return false;
+
+  try {
+    const payload = JSON.parse(base64UrlDecode(encodedPayload));
+    return Number.isFinite(payload.exp) && payload.exp > Date.now();
+  } catch (_) {
+    return false;
+  }
 }
 
 async function getTournament(env) {
@@ -281,10 +321,6 @@ async function handleLogin(request, env) {
 }
 
 async function handleLogout(request, env) {
-  const token = extractBearer(request);
-  if (token) {
-    await (await ensureSchema(env)).prepare('DELETE FROM kv WHERE key = ?').bind(`${SESSION_PREFIX}${token}`).run();
-  }
   return json({ ok: true });
 }
 
