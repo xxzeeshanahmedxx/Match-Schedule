@@ -228,7 +228,7 @@ function renderMatchEditor(m, numLabel) {
         ${locked ? '<span class="locked-note">Finish group stage to unlock scores</span>' : ''}
         <button data-action="reset" ${disabled}>Reset</button>
         <button class="live" data-action="live" ${disabled}>Live</button>
-        <button class="save" data-action="save">Save</button>
+        <button class="save" data-action="save" title="Save match details">💾 Save</button>
       </div>
     </div>
   `;

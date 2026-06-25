@@ -263,11 +263,12 @@ function renderHeader() {
   $('#foot-name').textContent = DATA.tournament.name;
   $('#foot-date').textContent = formatDate(DATA.tournament.startDate);
 
+  const totalModes = DATA.gameModes?.length || 0;
   const meta = [
     { label: 'Start Date', value: formatDate(DATA.tournament.startDate) },
-    { label: 'Format', value: DATA.tournament.format },
     { label: 'Group Progress', value: `${groupCompleted}/${groupTotal} Played` },
-    { label: 'Stream', value: DATA.tournament.streamed ? 'Live' : 'No Live Stream' }
+    { label: 'Game Modes', value: `${totalModes} Available` },
+    { label: 'Format', value: DATA.tournament.format }
   ];
   $('#meta-row').innerHTML = meta.map(m => `
     <div class="meta-chip">

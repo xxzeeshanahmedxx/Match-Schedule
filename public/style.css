@@ -1452,3 +1452,126 @@ footer.foot a {
   .team-logo { width: 26px; height: 26px; }
   .match-details { font-size: 7.5px; padding-inline: 4px; }
 }
+
+/* ───── Extra mobile cleanup: less messy, more scannable ───── */
+@media (max-width: 720px) {
+  .meta-chip:nth-child(4) {
+    grid-column: 1 / -1;
+  }
+  .meta-chip:nth-child(4) strong {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .next-card {
+    background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.025));
+  }
+  .next-teams {
+    grid-template-columns: 1fr 26px 1fr;
+  }
+  .featured-team strong {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .schedule {
+    align-items: start;
+  }
+  .match {
+    border-color: rgba(255,255,255,0.075);
+    background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.018));
+  }
+  .match.is-live,
+  .match.is-completed {
+    border-width: 1px;
+  }
+  .match-body {
+    padding-top: 14px;
+    min-height: 48px;
+  }
+  .match .team-logo {
+    display: none;
+  }
+  .team-name {
+    color: var(--text);
+    font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+  }
+  .team-score {
+    display: inline-grid;
+    min-width: 22px;
+    height: 22px;
+    margin-top: 4px;
+    place-items: center;
+    border-radius: 7px;
+    background: rgba(255,255,255,0.045);
+    font-size: 13px;
+  }
+  .vs {
+    align-self: center;
+    background: transparent;
+    padding: 0;
+    color: var(--muted);
+    font-size: 8px;
+  }
+  .match-details {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 3px;
+    background: rgba(0,0,0,0.14);
+  }
+  .match-details span {
+    display: block;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .match-foot span:first-child {
+    display: none;
+  }
+  .match-foot {
+    justify-content: center;
+    border-top-style: solid;
+  }
+
+  .standings-player strong {
+    display: block;
+    line-height: 1.05;
+  }
+  .mobile-stat-line {
+    max-width: 210px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .admin-toolbar {
+    justify-content: space-between;
+  }
+  .match-edit {
+    background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.018));
+  }
+  .match-edit .actions {
+    grid-template-columns: 0.85fr 0.85fr 1.3fr;
+  }
+  .match-edit .actions button {
+    min-height: 34px;
+    padding: 7px 4px;
+  }
+  .match-edit .actions button.save {
+    font-size: 10px;
+    letter-spacing: 0.03em;
+  }
+}
+
+@media (max-width: 380px) {
+  .team-name { font-size: 10px; }
+  .team-score { min-width: 20px; height: 20px; font-size: 12px; }
+  .match-body { grid-template-columns: 1fr 18px 1fr; }
+  .match-edit .actions { grid-template-columns: 1fr; }
+}
