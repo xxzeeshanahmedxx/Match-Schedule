@@ -350,7 +350,10 @@ function renderStandings() {
         <td>
           <div class="standings-player">
             <div class="mini-logo"><img src="${img(s.image)}" alt="${s.name}" data-image-file="${s.image}" loading="lazy" decoding="async" /></div>
-            ${s.name}
+            <div>
+              <strong>${s.name}</strong>
+              <span class="mobile-stat-line">GP ${s.gp} · ${s.w}-${s.d}-${s.l} · GF ${s.gf} GA ${s.ga} · GD ${s.gd > 0 ? '+' : ''}${s.gd}</span>
+            </div>
           </div>
         </td>
         <td>${s.gp}</td>
