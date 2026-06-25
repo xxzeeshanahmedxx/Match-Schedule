@@ -1,20 +1,21 @@
 # 🏆 Rocket League Championship — Tournament Tracker
 
-A full-stack tournament tracker for the **Rocket League Championship** with 5 players, 20 group-stage matches, a semi-final, and a grand final.
+A full-stack tournament tracker for the **Rocket League Championship** with 5 players, 20 group-stage matches, a semi-final/3rd-place match, and a grand final.
 
 ## ✨ Features
 
 - 🎮 **Public page** — players, live standings, full match schedule, knockout bracket
 - 🛠 **Admin panel** — password-protected score entry for every match
-- 📊 **Auto-calculated standings** — sorted by points → goal difference → goals scored
-- 🏆 **Dynamic knockout** — top 2 advance to Final, 3rd & 4th to Semi Final (auto-fills from standings)
+- 📊 **Auto-calculated standings** — sorted by points → goal difference → goals scored → wins
+- 🏆 **Dynamic knockout** — top 2 advance to Final, 3rd & 4th to Semi Final/3rd-place match (locks after group stage)
+- 🔴 **Live match states** — admin can mark matches live, complete, or reset
 - 📱 **Fully responsive** — works on phones, tablets, desktops
 - 💾 **Persistent storage** — results survive restarts (JSON file)
 - 🔄 **Auto-refresh** — public page polls every 30 s for live updates
 
 ## 🛠 Tech Stack
 
-- **Backend:** Node.js + Express (single file, ~150 LOC)
+- **Backend:** Node.js + Express (single file API/server)
 - **Storage:** JSON file (`data/tournament.json`) — no database setup needed
 - **Frontend:** Vanilla HTML + CSS + JavaScript — no build step
 - **Auth:** Simple bearer-token admin session (in-memory)
@@ -77,8 +78,8 @@ match-schedule/
 
 | Method | Path                | Description                              |
 |--------|---------------------|------------------------------------------|
-| GET    | `/api/tournament`   | Full tournament data (players + matches) |
-| GET    | `/api/standings`    | Live standings, computed from results    |
+| GET    | `/api/tournament`   | Full tournament data (players + matches + progress meta; knockout slots resolved after groups finish) |
+| GET    | `/api/standings`    | Live standings, computed from group results |
 
 ### Admin (requires `Authorization: Bearer <token>`)
 
@@ -86,7 +87,7 @@ match-schedule/
 |--------|----------------------------|-----------------------------------|
 | POST   | `/api/auth/login`          | `{ password }` → `{ token }`     |
 | POST   | `/api/auth/logout`         | Invalidate current token         |
-| PUT    | `/api/matches/:id`         | Set score / status for a match   |
+| PUT    | `/api/matches/:id`         | Set score, mark live, or reset a match |
 | POST   | `/api/reset`               | Reset all match results          |
 
 ## 🏅 Tournament Format
@@ -94,8 +95,9 @@ match-schedule/
 - **Group stage:** Round-robin — every player plays every other player **twice** (20 matches total)
 - **Points:** Win = 3 · Draw = 1 · Loss = 0
 - **Knockout:**
-  - 1st & 2nd place → **Final** (Bo3, 15 min + unlimited ET)
-  - 3rd & 4th place → **Semi Final** (Bo3, 15 min + unlimited ET)
+  - Knockout slots stay hidden until all 20 group-stage matches are completed
+  - 1st & 2nd place → **Grand Final** (Bo3, 15 min + unlimited ET)
+  - 3rd & 4th place → **Semi Final / 3rd-place match** (Bo3, 15 min + unlimited ET)
   - 5th place → eliminated
 - **Group matches:** 10 min + 5 min ET
 - **Game modes:** randomly selected per match
@@ -108,7 +110,7 @@ This app is tiny — it can run anywhere Node.js runs. A few zero-config options
 - **VPS / server:** clone → `npm install` → `npm start` behind nginx/pm2
 - **Local LAN:** `npm start`, share `http://your-lan-ip:3000/` with friends
 
-Set `ADMIN_PASSWORD` as a secret env var in production. `PORT` is also configurable.
+Set `ADMIN_PASSWORD` as a secret env var in production. `PORT` is also configurable. The server no longer prints the actual admin password to logs.
 
 ## 🔒 Security Note
 

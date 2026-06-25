@@ -1,9 +1,9 @@
 {
   "tournament": {
     "name": "Rocket League Championship",
-    "subtitle": "Season 1 \u00b7 2026",
+    "subtitle": "Season 1 · 2026",
     "startDate": "2026-06-26",
-    "format": "Round Robin \u2192 Semi Final \u2192 Final",
+    "format": "Round Robin → Semi Final → Final",
     "matchMinutes": 10,
     "extraMinutes": 5,
     "knockoutMinutes": 15,
@@ -25,11 +25,11 @@
     },
     {
       "title": "Points System",
-      "text": "Win = 3 pts \u00b7 Draw = 1 pt \u00b7 Loss = 0 pts"
+      "text": "Win = 3 pts · Draw = 1 pt · Loss = 0 pts"
     },
     {
       "title": "Top 4 Advance",
-      "text": "The top 4 players from the group stage qualify: 1 & 2 \u2192 Final, 3 & 4 \u2192 Semi Final."
+      "text": "The top 4 players from the group stage qualify: 1 & 2 → Final, 3 & 4 → Semi Final."
     },
     {
       "title": "Knockout Timing",
@@ -37,7 +37,7 @@
     },
     {
       "title": "No Live Stream",
-      "text": "Matches are recorded locally only \u2014 no public broadcasting."
+      "text": "Matches are recorded locally only — no public broadcasting."
     },
     {
       "title": "Random Game Modes",
@@ -271,6 +271,38 @@
       "score1": null,
       "score2": null,
       "status": "upcoming"
+    },
+    {
+      "id": "sf01",
+      "stage": "semifinal",
+      "order": 21,
+      "label": "Semi Final",
+      "player1": null,
+      "player2": null,
+      "slot1Rank": 3,
+      "slot2Rank": 4,
+      "score1": null,
+      "score2": null,
+      "status": "upcoming",
+      "series": "Best of 3",
+      "minutes": 15,
+      "extraTime": "unlimited"
+    },
+    {
+      "id": "f01",
+      "stage": "final",
+      "order": 22,
+      "label": "Grand Final",
+      "player1": null,
+      "player2": null,
+      "slot1Rank": 1,
+      "slot2Rank": 2,
+      "score1": null,
+      "score2": null,
+      "status": "upcoming",
+      "series": "Best of 3",
+      "minutes": 15,
+      "extraTime": "unlimited"
     }
   ]
 }

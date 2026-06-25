@@ -10,11 +10,28 @@ const $$ = sel => document.querySelectorAll(sel);
 let DATA = null;
 
 function img(path) { return `/images/${path}`; }
-function playerById(id) { return DATA.players.find(p => p.id === id); }
+function playerById(id) { return DATA.players.find(p => p.id === id) || null; }
 
 function getToken() { return localStorage.getItem(TOKEN_KEY); }
 function setToken(t) { localStorage.setItem(TOKEN_KEY, t); }
 function clearToken() { localStorage.removeItem(TOKEN_KEY); }
+
+function ordinal(n) {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+function stageName(stage) {
+  if (stage === 'group') return 'Group';
+  if (stage === 'semifinal') return 'Semi Final';
+  if (stage === 'final') return 'Grand Final';
+  return stage;
+}
+
+function isGroupComplete() {
+  return Boolean(DATA?.meta?.groupStageComplete);
+}
 
 async function api(path, opts = {}) {
   opts.headers = opts.headers || {};
@@ -78,34 +95,57 @@ async function doLogout() {
 
 // ───── Admin render ─────
 
+function renderTeamCell(player, rank, right = false) {
+  const direction = right ? ' right' : '';
+  if (!player) {
+    return `
+      <div class="team-cell${direction} is-tbd">
+        <div class="tbd-avatar">?</div>
+        <span class="name">${ordinal(rank)} Place</span>
+      </div>
+    `;
+  }
+  return `
+    <div class="team-cell${direction}">
+      <div class="team-logo"><img src="${img(player.image)}" alt="${player.name}" loading="lazy" decoding="async" /></div>
+      <span class="name">${player.name}</span>
+    </div>
+  `;
+}
+
 function renderMatchEditor(m, numLabel) {
   const p1 = playerById(m.player1);
   const p2 = playerById(m.player2);
   const s1 = m.score1 ?? '';
   const s2 = m.score2 ?? '';
   const status = m.status;
+  const locked = m.stage !== 'group' && !isGroupComplete();
+  const disabled = locked ? 'disabled' : '';
+  const stage = stageName(m.stage);
+  const stageHint = m.stage === 'group'
+    ? '10 min + 5 min ET'
+    : `${m.series || 'Best of 3'} · ${m.minutes || 15} min + ${m.extraTime || 'unlimited'} ET`;
 
   return `
-    <div class="match-edit ${status}" data-match-id="${m.id}" style="margin-bottom: 10px;">
-      <div class="label">${numLabel} · <span style="text-transform: uppercase;">${status}</span></div>
-
-      <div class="team-cell">
-        <div class="team-logo"><img src="${img(p1.image)}" alt="${p1.name}" loading="lazy" decoding="async" /></div>
-        <span class="name">${p1.name}</span>
+    <div class="match-edit ${status} ${locked ? 'is-locked' : ''}" data-match-id="${m.id}" style="margin-bottom: 10px;">
+      <div class="label">
+        ${numLabel} · ${stage} · <span style="text-transform: uppercase;">${status}</span>
+        <small>${stageHint}</small>
       </div>
 
-      <input type="number" min="0" data-side="1" value="${s1}" placeholder="—" />
+      ${renderTeamCell(p1, m.slot1Rank, false)}
 
-      <input type="number" min="0" data-side="2" value="${s2}" placeholder="—" />
+      <input type="number" min="0" step="1" inputmode="numeric" data-side="1" value="${s1}" placeholder="—" ${disabled} />
 
-      <div class="team-cell right">
-        <div class="team-logo"><img src="${img(p2.image)}" alt="${p2.name}" loading="lazy" decoding="async" /></div>
-        <span class="name">${p2.name}</span>
-      </div>
+      <input type="number" min="0" step="1" inputmode="numeric" data-side="2" value="${s2}" placeholder="—" ${disabled} />
+
+      ${renderTeamCell(p2, m.slot2Rank, true)}
 
       <div class="actions" style="grid-column: 1 / -1; flex-direction: row; justify-content: flex-end; gap: 8px;">
-        <button data-action="reset">Reset</button>
-        <button class="save" data-action="save">Save Score</button>
+        ${locked ? '<span class="locked-note">Finish group stage to unlock</span>' : ''}
+        <button data-action="reset" ${disabled}>Reset</button>
+        <button class="live" data-action="live" ${disabled}>Mark Live</button>
+        <button class="save" data-action="save" ${disabled}>Save Score</button>
       </div>
     </div>
   `;
@@ -121,23 +161,44 @@ async function loadAdmin() {
 }
 
 function renderMatches() {
-  const matches = DATA.matches.filter(m => m.stage === 'group').sort((a, b) => a.order - b.order);
-  $('#match-list').innerHTML = matches.map((m, i) => {
-    const label = 'M' + String(i + 1).padStart(2, '0');
-    return renderMatchEditor(m, label);
-  }).join('');
+  const group = DATA.matches.filter(m => m.stage === 'group').sort((a, b) => a.order - b.order);
+  const knockout = DATA.matches.filter(m => m.stage !== 'group').sort((a, b) => a.order - b.order);
+  const groupCompleted = DATA.meta?.groupCompleted ?? group.filter(m => m.status === 'completed').length;
+  const groupTotal = DATA.meta?.groupTotal ?? group.length;
+
+  const groupHtml = group.map((m, i) => renderMatchEditor(m, 'M' + String(i + 1).padStart(2, '0'))).join('');
+  const knockoutHtml = knockout.map((m, i) => renderMatchEditor(m, m.stage === 'final' ? 'FINAL' : 'SF')).join('');
+
+  $('#match-list').innerHTML = `
+    <div class="admin-section-title">
+      <h2>Group Stage</h2>
+      <span>${groupCompleted}/${groupTotal} completed</span>
+    </div>
+    ${groupHtml}
+
+    <div class="admin-section-title knockout-title">
+      <h2>Knockout Stage</h2>
+      <span>${isGroupComplete() ? 'Unlocked' : 'Locked until group stage ends'}</span>
+    </div>
+    ${!isGroupComplete() ? '<div class="admin-warning">Knockout participants are based on final standings and will be revealed once all group matches are completed.</div>' : ''}
+    ${knockoutHtml}
+  `;
 }
 
 async function saveMatch(matchId) {
   const editor = document.querySelector(`[data-match-id="${matchId}"]`);
+  if (editor?.classList.contains('is-locked')) {
+    alert('Finish all group-stage matches before editing knockout results.');
+    return;
+  }
   const s1 = editor.querySelector('[data-side="1"]').value;
   const s2 = editor.querySelector('[data-side="2"]').value;
   if (s1 === '' || s2 === '') {
     alert('Please enter both scores, or use Reset to clear.');
     return;
   }
-  if (Number(s1) < 0 || Number(s2) < 0) {
-    alert('Scores must be 0 or greater.');
+  if (!Number.isInteger(Number(s1)) || !Number.isInteger(Number(s2)) || Number(s1) < 0 || Number(s2) < 0) {
+    alert('Scores must be whole numbers 0 or greater.');
     return;
   }
   try {
@@ -145,12 +206,30 @@ async function saveMatch(matchId) {
       method: 'PUT',
       body: { score1: Number(s1), score2: Number(s2) }
     });
-    // Update local copy
     const idx = DATA.matches.findIndex(m => m.id === matchId);
     if (idx >= 0) DATA.matches[idx] = updated;
-    renderMatches();
+    await loadAdmin();
   } catch (e) {
     alert('Save failed: ' + e.message);
+  }
+}
+
+async function markLive(matchId) {
+  const editor = document.querySelector(`[data-match-id="${matchId}"]`);
+  if (editor?.classList.contains('is-locked')) {
+    alert('Finish all group-stage matches before editing knockout results.');
+    return;
+  }
+  try {
+    const updated = await api(`/api/matches/${matchId}`, {
+      method: 'PUT',
+      body: { status: 'live' }
+    });
+    const idx = DATA.matches.findIndex(m => m.id === matchId);
+    if (idx >= 0) DATA.matches[idx] = updated;
+    await loadAdmin();
+  } catch (e) {
+    alert('Mark live failed: ' + e.message);
   }
 }
 
@@ -163,7 +242,7 @@ async function resetMatch(matchId) {
     });
     const idx = DATA.matches.findIndex(m => m.id === matchId);
     if (idx >= 0) DATA.matches[idx] = updated;
-    renderMatches();
+    await loadAdmin();
   } catch (e) {
     alert('Reset failed: ' + e.message);
   }
@@ -189,6 +268,7 @@ document.addEventListener('click', e => {
     if (!id) return;
     if (btn.dataset.action === 'save') saveMatch(id);
     if (btn.dataset.action === 'reset') resetMatch(id);
+    if (btn.dataset.action === 'live') markLive(id);
     return;
   }
 });

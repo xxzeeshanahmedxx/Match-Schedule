@@ -12,6 +12,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'rocket2026';
 const DATA_FILE = path.join(__dirname, 'data', 'tournament.json');
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
 // ─────────── Middleware ───────────
 app.use(express.json({ limit: '64kb' }));
@@ -32,52 +33,48 @@ function writeData(data) {
   fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
 }
 
-function requireAdmin(req, res, next) {
-  const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
-  if (!token || !sessions.has(token)) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  next();
+function hasScore(match) {
+  return Number.isInteger(match.score1) && Number.isInteger(match.score2) && match.score1 >= 0 && match.score2 >= 0;
 }
 
-// ─────────── Auth (in-memory sessions) ───────────
-const sessions = new Map(); // token → createdAt
-
-function createSession() {
-  const token = crypto.randomBytes(24).toString('hex');
-  sessions.set(token, Date.now());
-  // prune old sessions (>24h)
-  for (const [k, v] of sessions) {
-    if (Date.now() - v > 24 * 60 * 60 * 1000) sessions.delete(k);
-  }
-  return token;
+function groupMatches(data) {
+  return data.matches.filter(m => m.stage === 'group');
 }
 
-// ─────────── Public API ───────────
+function groupProgress(data) {
+  const group = groupMatches(data);
+  const completed = group.filter(m => m.status === 'completed' && hasScore(m)).length;
+  return {
+    completed,
+    total: group.length,
+    complete: group.length > 0 && completed === group.length
+  };
+}
 
-// GET /api/tournament — full tournament state
-app.get('/api/tournament', (req, res) => {
-  const data = readData();
-  if (!data) return res.status(500).json({ error: 'Could not load tournament data' });
-  res.json(data);
-});
-
-// GET /api/standings — calculated from current match results
-app.get('/api/standings', (req, res) => {
-  const data = readData();
-  if (!data) return res.status(500).json({ error: 'Could not load data' });
-
+function calculateStandings(data) {
   const stats = {};
   for (const p of data.players) {
-    stats[p.id] = { id: p.id, name: p.name, image: p.image, gp: 0, w: 0, d: 0, l: 0, pts: 0, gf: 0, ga: 0 };
+    stats[p.id] = {
+      id: p.id,
+      name: p.name,
+      image: p.image,
+      gp: 0,
+      w: 0,
+      d: 0,
+      l: 0,
+      pts: 0,
+      gf: 0,
+      ga: 0,
+      gd: 0
+    };
   }
 
-  // Only count group-stage matches for standings
+  // Only count completed group-stage matches for standings.
   for (const m of data.matches) {
-    if (m.stage !== 'group' || m.status !== 'completed') continue;
-    if (m.score1 == null || m.score2 == null) continue;
+    if (m.stage !== 'group' || m.status !== 'completed' || !hasScore(m)) continue;
 
-    const a = stats[m.player1], b = stats[m.player2];
+    const a = stats[m.player1];
+    const b = stats[m.player2];
     if (!a || !b) continue;
 
     a.gp++; b.gp++;
@@ -93,14 +90,104 @@ app.get('/api/standings', (req, res) => {
     }
   }
 
-  const ranked = Object.values(stats).sort((x, y) => {
-    if (y.pts !== x.pts) return y.pts - x.pts;
-    const xgd = x.gf - x.ga, ygd = y.gf - y.ga;
-    if (ygd !== xgd) return ygd - xgd;
-    return y.gf - x.gf;
-  });
+  for (const s of Object.values(stats)) s.gd = s.gf - s.ga;
 
-  res.json(ranked);
+  return Object.values(stats).sort((x, y) => {
+    if (y.pts !== x.pts) return y.pts - x.pts;
+    if (y.gd !== x.gd) return y.gd - x.gd;
+    if (y.gf !== x.gf) return y.gf - x.gf;
+    if (y.w !== x.w) return y.w - x.w;
+    return x.name.localeCompare(y.name);
+  });
+}
+
+function resolveMatchParticipants(match, standings, progress) {
+  if (match.stage === 'group') return { ...match };
+
+  const resolved = { ...match };
+
+  // Knockout slots are ranking-based and only lock once the group stage is complete.
+  if (progress.complete) {
+    const p1 = standings[(match.slot1Rank || 0) - 1];
+    const p2 = standings[(match.slot2Rank || 0) - 1];
+    resolved.player1 = p1 ? p1.id : null;
+    resolved.player2 = p2 ? p2.id : null;
+  } else {
+    resolved.player1 = null;
+    resolved.player2 = null;
+  }
+
+  return resolved;
+}
+
+function buildTournamentPayload(data) {
+  const standings = calculateStandings(data);
+  const progress = groupProgress(data);
+
+  return {
+    ...data,
+    matches: data.matches.map(m => resolveMatchParticipants(m, standings, progress)),
+    meta: {
+      ...(data.meta || {}),
+      groupCompleted: progress.completed,
+      groupTotal: progress.total,
+      groupStageComplete: progress.complete
+    }
+  };
+}
+
+function resetKnockoutResults(data) {
+  for (const m of data.matches) {
+    if (m.stage === 'group') continue;
+    m.score1 = null;
+    m.score2 = null;
+    m.status = 'upcoming';
+  }
+}
+
+function extractBearer(req) {
+  return (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
+}
+
+function requireAdmin(req, res, next) {
+  const token = extractBearer(req);
+  if (!token || !sessions.has(token)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+}
+
+// ─────────── Auth (in-memory sessions) ───────────
+const sessions = new Map(); // token → createdAt
+
+function pruneSessions() {
+  const now = Date.now();
+  for (const [k, v] of sessions) {
+    if (now - v > SESSION_TTL_MS) sessions.delete(k);
+  }
+}
+
+function createSession() {
+  pruneSessions();
+  const token = crypto.randomBytes(24).toString('hex');
+  sessions.set(token, Date.now());
+  return token;
+}
+
+// ─────────── Public API ───────────
+
+// GET /api/tournament — full tournament state with dynamic knockout slots resolved
+app.get('/api/tournament', (req, res) => {
+  const data = readData();
+  if (!data) return res.status(500).json({ error: 'Could not load tournament data' });
+  res.json(buildTournamentPayload(data));
+});
+
+// GET /api/standings — calculated from current group results
+app.get('/api/standings', (req, res) => {
+  const data = readData();
+  if (!data) return res.status(500).json({ error: 'Could not load data' });
+  res.json(calculateStandings(data));
 });
 
 // ─────────── Admin auth ───────────
@@ -115,14 +202,14 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 app.post('/api/auth/logout', (req, res) => {
-  const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
+  const token = extractBearer(req);
   if (token) sessions.delete(token);
   res.json({ ok: true });
 });
 
 // ─────────── Admin: matches ───────────
 
-// PUT /api/matches/:id — set score / status for a match
+// PUT /api/matches/:id — set score, mark live, or reset a match
 app.put('/api/matches/:id', requireAdmin, (req, res) => {
   const data = readData();
   if (!data) return res.status(500).json({ error: 'Could not load data' });
@@ -131,26 +218,39 @@ app.put('/api/matches/:id', requireAdmin, (req, res) => {
   if (!match) return res.status(404).json({ error: 'Match not found' });
 
   const { score1, score2, status } = req.body || {};
+  const progress = groupProgress(data);
+
+  if (match.stage !== 'group' && !progress.complete) {
+    return res.status(409).json({ error: 'Finish all group-stage matches before editing knockout results.' });
+  }
 
   if (status === 'reset' || (score1 === null && score2 === null && status === 'upcoming')) {
     match.score1 = null;
     match.score2 = null;
     match.status = 'upcoming';
+  } else if (status === 'live') {
+    match.status = 'live';
+    if (score1 === null || score1 === undefined) match.score1 = null;
+    if (score2 === null || score2 === undefined) match.score2 = null;
   } else {
-    if (typeof score1 === 'number' && typeof score2 === 'number' && score1 >= 0 && score2 >= 0) {
-      match.score1 = score1;
-      match.score2 = score2;
-      match.status = 'completed';
-    } else {
-      return res.status(400).json({ error: 'Invalid score. Use non-negative numbers.' });
+    if (!Number.isInteger(score1) || !Number.isInteger(score2) || score1 < 0 || score2 < 0) {
+      return res.status(400).json({ error: 'Invalid score. Use whole, non-negative numbers.' });
     }
-    if (status && ['upcoming', 'live', 'completed'].includes(status)) {
-      match.status = status;
-    }
+
+    match.score1 = score1;
+    match.score2 = score2;
+    match.status = status && ['upcoming', 'live', 'completed'].includes(status) ? status : 'completed';
   }
 
+  // Group results drive knockout slots. If a group match changes after knockouts
+  // were entered, clear knockout scores so old results are not attached to new seeds.
+  if (match.stage === 'group') resetKnockoutResults(data);
+
   writeData(data);
-  res.json(match);
+
+  const standings = calculateStandings(data);
+  const nextProgress = groupProgress(data);
+  res.json(resolveMatchParticipants(match, standings, nextProgress));
 });
 
 // POST /api/reset — reset all match results (keeps schedule)
@@ -180,5 +280,5 @@ app.listen(PORT, () => {
   console.log(`\n🏆  Rocket League Championship server running`);
   console.log(`   Public:  http://localhost:${PORT}/`);
   console.log(`   Admin:   http://localhost:${PORT}/admin`);
-  console.log(`   Password: ${ADMIN_PASSWORD}  (set ADMIN_PASSWORD env var to change)\n`);
+  console.log(`   Admin password: ${process.env.ADMIN_PASSWORD ? 'custom env var set' : 'using default (set ADMIN_PASSWORD env var to change)'}\n`);
 });
