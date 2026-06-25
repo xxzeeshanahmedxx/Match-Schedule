@@ -7,4 +7,4 @@ compatibility_date = "2026-06-26"
 [[d1_databases]]
 binding = "DB"
 database_name = "match-schedule-db"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_id = "b9318bd8-8ed2-438a-b803-7da3616b43ca"
