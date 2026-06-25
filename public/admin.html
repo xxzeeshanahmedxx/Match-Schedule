@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Admin · RL Championship</title>
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+
+<!-- Login screen (shown when not authenticated) -->
+<div id="login-screen" class="login-card">
+  <h2>Admin Login</h2>
+  <p>Enter the tournament admin password to manage match scores.</p>
+  <input id="pw" type="password" placeholder="Password" autocomplete="current-password" />
+  <button id="login-btn">Sign In</button>
+  <div id="login-error" class="error"></div>
+</div>
+
+<!-- Admin panel (shown after login) -->
+<div id="admin-panel" class="admin-shell" style="display:none;">
+  <div class="admin-head">
+    <h1>⚙ Match Admin</h1>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <a href="/" style="color: var(--accent-2); text-decoration: none; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">← Public View</a>
+      <button id="logout-btn" class="admin-logout">Sign Out</button>
+    </div>
+  </div>
+
+  <div class="admin-toolbar">
+    <button id="reset-all">Reset All Results</button>
+  </div>
+
+  <div id="match-list"></div>
+</div>
+
+<script src="/admin.js"></script>
+</body>
+</html>

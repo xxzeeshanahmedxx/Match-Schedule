@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RL Championship · 2026</title>
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="badge"><span class="dot"></span> <span id="badge-text">Season 1 · 2026</span></div>
+    <h1 class="title">ROCKET LEAGUE<br/>CHAMPIONSHIP</h1>
+    <div class="subtitle" id="subtitle">5 Players · 21 Matches · 1 Champion</div>
+
+    <div class="meta-row" id="meta-row"></div>
+  </header>
+
+  <section>
+    <div class="section-head">
+      <h2>Players</h2>
+      <span class="section-num">/01</span>
+    </div>
+    <div class="players-grid" id="players-grid"></div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Standings</h2>
+      <span class="section-num">/02</span>
+    </div>
+    <div class="standings-wrap">
+      <table class="standings">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Player</th>
+            <th>GP</th>
+            <th>W</th>
+            <th>D</th>
+            <th>L</th>
+            <th>PTS</th>
+          </tr>
+        </thead>
+        <tbody id="standings-body">
+          <tr><td colspan="7" style="text-align:center; color: var(--muted); padding: 32px;">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Match Schedule</h2>
+      <span class="section-num">/03</span>
+    </div>
+    <div class="schedule" id="schedule"></div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Knockout Stage</h2>
+      <span class="section-num">/04</span>
+    </div>
+    <div class="knockout" id="knockout"></div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Tournament Rules</h2>
+      <span class="section-num">/05</span>
+    </div>
+    <div class="rules-grid" id="rules-grid"></div>
+  </section>
+
+  <footer class="foot">
+    <span id="foot-name">Rocket League Championship</span> · Kicks off <span id="foot-date">26 June 2026</span> · See you on the pitch 🚀
+    <a href="/admin">Admin</a>
+  </footer>
+
+</div>
+<script src="/app.js"></script>
+</body>
+</html>
