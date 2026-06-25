@@ -18,9 +18,11 @@ const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 // ─────────── Middleware ───────────
 app.use(express.json({ limit: '64kb' }));
 app.use(express.static(PUBLIC_DIR));
-// Also expose public assets under the repository name so images/CSS still load
-// if the app is previewed or proxied from /Match-Schedule/.
+// Also expose public assets under common static-preview prefixes so images/CSS
+// still load if the app is opened from /public/ or /Match-Schedule/.
+app.use('/public', express.static(PUBLIC_DIR));
 app.use('/Match-Schedule', express.static(PUBLIC_DIR));
+app.use('/Match-Schedule/public', express.static(PUBLIC_DIR));
 
 // ─────────── Data helpers ───────────
 function readData() {
