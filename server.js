@@ -182,9 +182,18 @@ function normalizeTime(value) {
   return value;
 }
 
-function applyScheduleFields(match, body) {
+function normalizeGameMode(value, data) {
+  if (value === null || value === '') return null;
+  if (typeof value !== 'string') throw new Error('Invalid game mode.');
+  const modes = data.gameModes || [];
+  if (!modes.includes(value)) throw new Error('Invalid game mode. Choose one of the allowed Rocket League modes.');
+  return value;
+}
+
+function applyMatchMetaFields(match, body, data) {
   if (hasOwn(body, 'date')) match.date = normalizeDate(body.date);
   if (hasOwn(body, 'time')) match.time = normalizeTime(body.time);
+  if (hasOwn(body, 'gameMode')) match.gameMode = normalizeGameMode(body.gameMode, data);
 }
 
 function extractBearer(req) {
@@ -272,17 +281,17 @@ app.put('/api/matches/:id', requireAdmin, (req, res) => {
   const body = req.body || {};
   const { score1, score2, status } = body;
   const progress = groupProgress(data);
-  const hasScheduleUpdate = hasOwn(body, 'date') || hasOwn(body, 'time');
+  const hasMetaUpdate = hasOwn(body, 'date') || hasOwn(body, 'time') || hasOwn(body, 'gameMode');
   const hasResultOrStatusUpdate = hasOwn(body, 'score1') || hasOwn(body, 'score2') || hasOwn(body, 'status');
 
   // Knockout players/results are locked until groups finish, but admins may still
-  // pre-schedule knockout dates/times before participants are known.
+  // pre-schedule knockout date/time/mode before participants are known.
   if (match.stage !== 'group' && !progress.complete && hasResultOrStatusUpdate) {
     return res.status(409).json({ error: 'Finish all group-stage matches before editing knockout results.' });
   }
 
   try {
-    if (hasScheduleUpdate) applyScheduleFields(match, body);
+    if (hasMetaUpdate) applyMatchMetaFields(match, body, data);
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
@@ -311,7 +320,7 @@ app.put('/api/matches/:id', requireAdmin, (req, res) => {
     if (match.stage === 'group') resetKnockoutResults(data);
   }
 
-  if (!hasScheduleUpdate && !hasResultOrStatusUpdate) {
+  if (!hasMetaUpdate && !hasResultOrStatusUpdate) {
     return res.status(400).json({ error: 'No match updates provided.' });
   }
 

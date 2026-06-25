@@ -82,7 +82,8 @@ export default {
       "score2": null,
       "status": "upcoming",
       "date": null,
-      "time": null
+      "time": null,
+      "gameMode": null
     },
     {
       "id": "m02",
@@ -94,7 +95,8 @@ export default {
       "score2": null,
       "status": "upcoming",
       "date": null,
-      "time": null
+      "time": null,
+      "gameMode": null
     },
     {
       "id": "m03",
@@ -106,7 +108,8 @@ export default {
       "score2": null,
       "status": "upcoming",
       "date": null,
-      "time": null
+      "time": null,
+      "gameMode": null
     },
     {
       "id": "m04",
@@ -118,7 +121,8 @@ export default {
       "score2": null,
       "status": "upcoming",
       "date": null,
-      "time": null
+      "time": null,
+      "gameMode": null
     },
     {
       "id": "m05",
@@ -130,7 +134,8 @@ export default {
       "score2": null,
       "status": "upcoming",
       "date": null,
-      "time": null
+      "time": null,
+      "gameMode": null
     },
     {
       "id": "m06",
@@ -142,7 +147,8 @@ export default {
       "score2": null,
       "status": "upcoming",
       "date": null,
-      "time": null
+      "time": null,
+      "gameMode": null
     },
     {
       "id": "m07",
@@ -154,7 +160,8 @@ export default {
       "score2": null,
       "status": "upcoming",
       "date": null,
-      "time": null
+      "time": null,
+      "gameMode": null
     },
     {
       "id": "m08",
@@ -166,7 +173,8 @@ export default {
       "score2": null,
       "status": "upcoming",
       "date": null,
-      "time": null
+      "time": null,
+      "gameMode": null
     },
     {
       "id": "m09",
@@ -178,7 +186,8 @@ export default {
       "score2": null,
       "status": "upcoming",
       "date": null,
-      "time": null
+      "time": null,
+      "gameMode": null
     },
     {
       "id": "m10",
@@ -190,7 +199,8 @@ export default {
       "score2": null,
       "status": "upcoming",
       "date": null,
-      "time": null
+      "time": null,
+      "gameMode": null
     },
     {
       "id": "m11",
@@ -202,7 +212,8 @@ export default {
       "score2": null,
       "status": "upcoming",
       "date": null,
-      "time": null
+      "time": null,
+      "gameMode": null
     },
     {
       "id": "m12",
@@ -214,7 +225,8 @@ export default {
       "score2": null,
       "status": "upcoming",
       "date": null,
-      "time": null
+      "time": null,
+      "gameMode": null
     },
     {
       "id": "m13",
@@ -226,7 +238,8 @@ export default {
       "score2": null,
       "status": "upcoming",
       "date": null,
-      "time": null
+      "time": null,
+      "gameMode": null
     },
     {
       "id": "m14",
@@ -238,7 +251,8 @@ export default {
       "score2": null,
       "status": "upcoming",
       "date": null,
-      "time": null
+      "time": null,
+      "gameMode": null
     },
     {
       "id": "m15",
@@ -250,7 +264,8 @@ export default {
       "score2": null,
       "status": "upcoming",
       "date": null,
-      "time": null
+      "time": null,
+      "gameMode": null
     },
     {
       "id": "m16",
@@ -262,7 +277,8 @@ export default {
       "score2": null,
       "status": "upcoming",
       "date": null,
-      "time": null
+      "time": null,
+      "gameMode": null
     },
     {
       "id": "m17",
@@ -274,7 +290,8 @@ export default {
       "score2": null,
       "status": "upcoming",
       "date": null,
-      "time": null
+      "time": null,
+      "gameMode": null
     },
     {
       "id": "m18",
@@ -286,7 +303,8 @@ export default {
       "score2": null,
       "status": "upcoming",
       "date": null,
-      "time": null
+      "time": null,
+      "gameMode": null
     },
     {
       "id": "m19",
@@ -298,7 +316,8 @@ export default {
       "score2": null,
       "status": "upcoming",
       "date": null,
-      "time": null
+      "time": null,
+      "gameMode": null
     },
     {
       "id": "m20",
@@ -310,7 +329,8 @@ export default {
       "score2": null,
       "status": "upcoming",
       "date": null,
-      "time": null
+      "time": null,
+      "gameMode": null
     },
     {
       "id": "sf01",
@@ -328,7 +348,8 @@ export default {
       "minutes": 15,
       "extraTime": "unlimited",
       "date": null,
-      "time": null
+      "time": null,
+      "gameMode": null
     },
     {
       "id": "f01",
@@ -346,7 +367,36 @@ export default {
       "minutes": 15,
       "extraTime": "unlimited",
       "date": null,
-      "time": null
+      "time": null,
+      "gameMode": null
     }
+  ],
+  "gameModes": [
+    "Beach Ball",
+    "Boomer Ball",
+    "Confidential thirdwheel test",
+    "DC Super Heroes",
+    "Dropshot Rumble",
+    "Eggstra Special Mode",
+    "Ghost Hunt",
+    "Gotham City Rumble",
+    "Gridiron",
+    "Haunted Heatseeker",
+    "Heatseeker",
+    "Heatseeker Ricochet",
+    "Knockout",
+    "Loophole",
+    "Nike FC Showdown",
+    "Run it back",
+    "Speed Demon",
+    "Spike Rush",
+    "Split Shot",
+    "Split Shot Heatseeker",
+    "Split Shot Snowday",
+    "Spooky Cube",
+    "Spring Loaded",
+    "Super Cube",
+    "Tactical Rumble",
+    "Winter Breakaway"
   ]
 };

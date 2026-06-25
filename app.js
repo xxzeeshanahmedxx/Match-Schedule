@@ -98,6 +98,10 @@ function statusLabel(status) {
   return 'Upcoming';
 }
 
+function formatGameMode(match) {
+  return match.gameMode || 'Mode TBD';
+}
+
 function formatMatchDateTime(match) {
   if (!match.date && !match.time) return 'Date/time TBD';
 
@@ -318,7 +322,10 @@ function renderMatchCard(m, numLabel) {
           <div class="team-score ${score2Class}">${score2Text}</div>
         </div>
       </div>
-      <div class="match-time">📅 ${formatMatchDateTime(m)}</div>
+      <div class="match-details">
+        <span>📅 ${formatMatchDateTime(m)}</span>
+        <span>🎮 ${formatGameMode(m)}</span>
+      </div>
       <div class="match-foot">
         <span>Group</span>
         <span class="status ${m.status}">${statusLabel(m.status)}</span>
@@ -408,7 +415,7 @@ function renderKnockoutStage(match) {
       <div class="stage-label">${isFinal ? 'Grand Prize' : 'Round 1 · 3rd/4th Place'}</div>
       <div class="stage-title">${isFinal ? '🏆 ' : ''}${stageName(match.stage).toUpperCase()}</div>
       <div class="stage-desc">${match.series || 'Best of 3'} · ${match.minutes || DATA.tournament.knockoutMinutes} min + ${match.extraTime || DATA.tournament.knockoutExtraTime} ET</div>
-      <div class="stage-time">📅 ${formatMatchDateTime(match)}</div>
+      <div class="stage-time">📅 ${formatMatchDateTime(match)} · 🎮 ${formatGameMode(match)}</div>
       ${renderKnockoutSlot(match, 1)}
       <div class="knockout-versus">⚔</div>
       ${renderKnockoutSlot(match, 2)}
@@ -494,7 +501,7 @@ function renderNextUp() {
         <div class="next-vs">VS</div>
         ${renderFeaturedTeam(p2, match.slot2Rank)}
       </div>
-      <div class="next-time">📅 ${formatMatchDateTime(match)}</div>
+      <div class="next-time">📅 ${formatMatchDateTime(match)} · 🎮 ${formatGameMode(match)}</div>
     </div>
   `;
 }

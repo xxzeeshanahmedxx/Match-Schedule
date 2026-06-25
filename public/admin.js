@@ -80,11 +80,19 @@ function isGroupComplete() {
   return Boolean(DATA?.meta?.groupStageComplete);
 }
 
-function readScheduleFields(editor) {
+function readMatchMetaFields(editor) {
   return {
     date: editor.querySelector('[data-field="date"]')?.value || null,
-    time: editor.querySelector('[data-field="time"]')?.value || null
+    time: editor.querySelector('[data-field="time"]')?.value || null,
+    gameMode: editor.querySelector('[data-field="gameMode"]')?.value || null
   };
+}
+
+function gameModeOptions(selected) {
+  const modes = DATA.gameModes || [];
+  return ['<option value="">Mode TBD</option>', ...modes.map(mode => (
+    `<option value="${mode}" ${mode === selected ? 'selected' : ''}>${mode}</option>`
+  ))].join('');
 }
 
 async function api(path, opts = {}) {
@@ -177,6 +185,7 @@ function renderMatchEditor(m, numLabel) {
   const s2 = m.score2 ?? '';
   const matchDate = m.date || '';
   const matchTime = m.time || '';
+  const matchMode = m.gameMode || '';
   const status = m.status;
   const locked = m.stage !== 'group' && !isGroupComplete();
   const disabled = locked ? 'disabled' : '';
@@ -209,14 +218,17 @@ function renderMatchEditor(m, numLabel) {
           <span>Time</span>
           <input type="time" data-field="time" value="${matchTime}" />
         </label>
+        <label class="mode-label">
+          <span>Game Mode</span>
+          <select data-field="gameMode">${gameModeOptions(matchMode)}</select>
+        </label>
       </div>
 
       <div class="actions" style="grid-column: 1 / -1; flex-direction: row; justify-content: flex-end; gap: 8px;">
         ${locked ? '<span class="locked-note">Finish group stage to unlock scores</span>' : ''}
-        <button data-action="schedule">Save Date/Time</button>
         <button data-action="reset" ${disabled}>Reset</button>
-        <button class="live" data-action="live" ${disabled}>Mark Live</button>
-        <button class="save" data-action="save" ${disabled}>Save Score</button>
+        <button class="live" data-action="live" ${disabled}>Live</button>
+        <button class="save" data-action="save">Save</button>
       </div>
     </div>
   `;
@@ -258,46 +270,38 @@ function renderMatches() {
 
 async function saveMatch(matchId) {
   const editor = document.querySelector(`[data-match-id="${matchId}"]`);
-  if (editor?.classList.contains('is-locked')) {
-    alert('Finish all group-stage matches before editing knockout results.');
-    return;
-  }
+  const locked = editor?.classList.contains('is-locked');
   const s1 = editor.querySelector('[data-side="1"]').value;
   const s2 = editor.querySelector('[data-side="2"]').value;
-  const schedule = readScheduleFields(editor);
-  if (s1 === '' || s2 === '') {
-    alert('Please enter both scores, or use Reset to clear.');
-    return;
+  const body = readMatchMetaFields(editor);
+
+  if (s1 !== '' || s2 !== '') {
+    if (locked) {
+      alert('Finish all group-stage matches before saving knockout scores. You can still save date/time/mode.');
+      return;
+    }
+    if (s1 === '' || s2 === '') {
+      alert('Enter both scores, or leave both blank to save only date/time/mode.');
+      return;
+    }
+    if (!Number.isInteger(Number(s1)) || !Number.isInteger(Number(s2)) || Number(s1) < 0 || Number(s2) < 0) {
+      alert('Scores must be whole numbers 0 or greater.');
+      return;
+    }
+    body.score1 = Number(s1);
+    body.score2 = Number(s2);
   }
-  if (!Number.isInteger(Number(s1)) || !Number.isInteger(Number(s2)) || Number(s1) < 0 || Number(s2) < 0) {
-    alert('Scores must be whole numbers 0 or greater.');
-    return;
-  }
+
   try {
     const updated = await api(`/api/matches/${matchId}`, {
       method: 'PUT',
-      body: { score1: Number(s1), score2: Number(s2), ...schedule }
+      body
     });
     const idx = DATA.matches.findIndex(m => m.id === matchId);
     if (idx >= 0) DATA.matches[idx] = updated;
     await loadAdmin();
   } catch (e) {
     alert('Save failed: ' + e.message);
-  }
-}
-
-async function saveSchedule(matchId) {
-  const editor = document.querySelector(`[data-match-id="${matchId}"]`);
-  try {
-    const updated = await api(`/api/matches/${matchId}`, {
-      method: 'PUT',
-      body: readScheduleFields(editor)
-    });
-    const idx = DATA.matches.findIndex(m => m.id === matchId);
-    if (idx >= 0) DATA.matches[idx] = updated;
-    await loadAdmin();
-  } catch (e) {
-    alert('Date/time save failed: ' + e.message);
   }
 }
 
@@ -310,7 +314,7 @@ async function markLive(matchId) {
   try {
     const updated = await api(`/api/matches/${matchId}`, {
       method: 'PUT',
-      body: { status: 'live', ...readScheduleFields(editor) }
+      body: { status: 'live', ...readMatchMetaFields(editor) }
     });
     const idx = DATA.matches.findIndex(m => m.id === matchId);
     if (idx >= 0) DATA.matches[idx] = updated;
@@ -354,7 +358,6 @@ document.addEventListener('click', e => {
     const id = editor?.dataset.matchId;
     if (!id) return;
     if (btn.dataset.action === 'save') saveMatch(id);
-    if (btn.dataset.action === 'schedule') saveSchedule(id);
     if (btn.dataset.action === 'reset') resetMatch(id);
     if (btn.dataset.action === 'live') markLive(id);
     return;

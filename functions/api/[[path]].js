@@ -9,6 +9,7 @@ import INITIAL_TOURNAMENT from './seed.js';
 
 const TOURNAMENT_KEY = 'tournament';
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_GAME_MODES = INITIAL_TOURNAMENT.gameModes || [];
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -196,9 +197,18 @@ function normalizeTime(value) {
   return value;
 }
 
-function applyScheduleFields(match, body) {
+function normalizeGameMode(value, data) {
+  if (value === null || value === '') return null;
+  if (typeof value !== 'string') throw new Error('Invalid game mode.');
+  const modes = data.gameModes || [];
+  if (!modes.includes(value)) throw new Error('Invalid game mode. Choose one of the allowed Rocket League modes.');
+  return value;
+}
+
+function applyMatchMetaFields(match, body, data) {
   if (hasOwn(body, 'date')) match.date = normalizeDate(body.date);
   if (hasOwn(body, 'time')) match.time = normalizeTime(body.time);
+  if (hasOwn(body, 'gameMode')) match.gameMode = normalizeGameMode(body.gameMode, data);
 }
 
 function extractBearer(request) {
@@ -276,12 +286,29 @@ async function requireAdmin(request, env) {
   }
 }
 
+function ensureTournamentShape(data) {
+  let changed = false;
+  if (!Array.isArray(data.gameModes) || data.gameModes.length === 0) {
+    data.gameModes = DEFAULT_GAME_MODES;
+    changed = true;
+  }
+  for (const match of data.matches || []) {
+    if (!hasOwn(match, 'gameMode')) {
+      match.gameMode = null;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 async function getTournament(env) {
   let data = await getKV(env, TOURNAMENT_KEY);
   if (!data) {
     // Auto-seed the database on first request so a fresh D1 binding can start
     // working even before the user manually runs migrations.
     data = JSON.parse(JSON.stringify(INITIAL_TOURNAMENT));
+    await putKV(env, TOURNAMENT_KEY, data);
+  } else if (ensureTournamentShape(data)) {
     await putKV(env, TOURNAMENT_KEY, data);
   }
   return data;
@@ -340,7 +367,7 @@ async function handleUpdateMatch(request, env, matchId) {
   const body = await readBody(request);
   const { score1, score2, status } = body;
   const progress = groupProgress(data);
-  const hasScheduleUpdate = hasOwn(body, 'date') || hasOwn(body, 'time');
+  const hasMetaUpdate = hasOwn(body, 'date') || hasOwn(body, 'time') || hasOwn(body, 'gameMode');
   const hasResultOrStatusUpdate = hasOwn(body, 'score1') || hasOwn(body, 'score2') || hasOwn(body, 'status');
 
   if (match.stage !== 'group' && !progress.complete && hasResultOrStatusUpdate) {
@@ -348,7 +375,7 @@ async function handleUpdateMatch(request, env, matchId) {
   }
 
   try {
-    if (hasScheduleUpdate) applyScheduleFields(match, body);
+    if (hasMetaUpdate) applyMatchMetaFields(match, body, data);
   } catch (err) {
     return json({ error: err.message }, 400);
   }
@@ -375,7 +402,7 @@ async function handleUpdateMatch(request, env, matchId) {
     if (match.stage === 'group') resetKnockoutResults(data);
   }
 
-  if (!hasScheduleUpdate && !hasResultOrStatusUpdate) {
+  if (!hasMetaUpdate && !hasResultOrStatusUpdate) {
     return json({ error: 'No match updates provided.' }, 400);
   }
 
