@@ -1,3 +1,5 @@
+import INITIAL_TOURNAMENT from './seed.js';
+
 /**
  * Cloudflare Pages Functions API backed by D1.
  *
@@ -28,18 +30,30 @@ async function readBody(request) {
 }
 
 function requireDB(env) {
-  if (!env.DB) throw new Error('D1 binding missing. Add a DB binding named DB.');
+  if (!env.DB) throw new Error('D1 binding missing. Add a D1 binding named DB in Cloudflare Pages settings.');
   return env.DB;
 }
 
-async function getKV(env, key) {
+async function ensureSchema(env) {
   const db = requireDB(env);
+  await db.prepare(`
+    CREATE TABLE IF NOT EXISTS kv (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `).run();
+  return db;
+}
+
+async function getKV(env, key) {
+  const db = await ensureSchema(env);
   const row = await db.prepare('SELECT value FROM kv WHERE key = ?').bind(key).first();
   return row ? JSON.parse(row.value) : null;
 }
 
 async function putKV(env, key, value) {
-  const db = requireDB(env);
+  const db = await ensureSchema(env);
   await db.prepare(`
     INSERT INTO kv (key, value, updated_at)
     VALUES (?, ?, CURRENT_TIMESTAMP)
@@ -195,7 +209,7 @@ function createToken() {
 }
 
 async function pruneSessions(env) {
-  const db = requireDB(env);
+  const db = await ensureSchema(env);
   await db.prepare(`
     DELETE FROM kv
     WHERE key LIKE ?
@@ -219,11 +233,29 @@ async function requireAdmin(request, env) {
 }
 
 async function getTournament(env) {
-  const data = await getKV(env, TOURNAMENT_KEY);
+  let data = await getKV(env, TOURNAMENT_KEY);
   if (!data) {
-    return null;
+    // Auto-seed the database on first request so a fresh D1 binding can start
+    // working even before the user manually runs migrations.
+    data = JSON.parse(JSON.stringify(INITIAL_TOURNAMENT));
+    await putKV(env, TOURNAMENT_KEY, data);
   }
   return data;
+}
+
+async function handleHealth(env) {
+  try {
+    await ensureSchema(env);
+    const tournament = await getTournament(env);
+    return json({
+      ok: true,
+      dbBinding: 'DB',
+      tournamentLoaded: Boolean(tournament),
+      matches: tournament?.matches?.length || 0
+    });
+  } catch (err) {
+    return json({ ok: false, error: err.message }, 500);
+  }
 }
 
 async function handleGetTournament(env) {
@@ -251,7 +283,7 @@ async function handleLogin(request, env) {
 async function handleLogout(request, env) {
   const token = extractBearer(request);
   if (token) {
-    await requireDB(env).prepare('DELETE FROM kv WHERE key = ?').bind(`${SESSION_PREFIX}${token}`).run();
+    await (await ensureSchema(env)).prepare('DELETE FROM kv WHERE key = ?').bind(`${SESSION_PREFIX}${token}`).run();
   }
   return json({ ok: true });
 }
@@ -339,6 +371,7 @@ export async function onRequest(context) {
   if (method === 'OPTIONS') return new Response(null, { status: 204 });
 
   try {
+    if (method === 'GET' && path === '/api/health') return handleHealth(env);
     if (method === 'GET' && path === '/api/tournament') return handleGetTournament(env);
     if (method === 'GET' && path === '/api/standings') return handleGetStandings(env);
     if (method === 'POST' && path === '/api/auth/login') return handleLogin(request, env);

@@ -114,8 +114,11 @@ async function doLogin() {
       body: JSON.stringify({ password: pw })
     });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Login failed');
+      const contentType = res.headers.get('content-type') || '';
+      const err = contentType.includes('application/json')
+        ? await res.json().catch(() => ({}))
+        : { error: await res.text().catch(() => '') };
+      throw new Error(err.error || `Login failed (${res.status}). API may not be deployed or D1 may not be bound.`);
     }
     const { token } = await res.json();
     setToken(token);

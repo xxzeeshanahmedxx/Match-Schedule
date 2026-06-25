@@ -211,6 +211,16 @@ function createSession() {
 
 // ─────────── Public API ───────────
 
+// GET /api/health — basic API/storage health check
+app.get('/api/health', (req, res) => {
+  const data = readData();
+  res.status(data ? 200 : 500).json({
+    ok: Boolean(data),
+    storage: 'json-file',
+    matches: data?.matches?.length || 0
+  });
+});
+
 // GET /api/tournament — full tournament state with dynamic knockout slots resolved
 app.get('/api/tournament', (req, res) => {
   const data = readData();

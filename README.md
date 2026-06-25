@@ -99,6 +99,7 @@ match-schedule/
 
 | Method | Path                | Description                              |
 |--------|---------------------|------------------------------------------|
+| GET    | `/api/health`       | D1/API health check for Cloudflare deploys |
 | GET    | `/api/tournament`   | Full tournament data (players + matches + progress meta; knockout slots resolved after groups finish) |
 | GET    | `/api/standings`    | Live standings, computed from group results |
 
@@ -154,7 +155,7 @@ database_id = "paste-your-real-database-id-here"
 npm run d1:migrate:remote
 ```
 
-This creates the `kv` table and inserts the initial tournament JSON into D1.
+This creates the `kv` table and inserts the initial tournament JSON into D1. The Function also auto-creates/seeds the table on first request, but running migrations is still recommended.
 
 ### 4) Set the admin password secret
 
