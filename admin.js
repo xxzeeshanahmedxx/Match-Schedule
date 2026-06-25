@@ -22,25 +22,37 @@ const IMAGE_BASES = [...new Set([
   repoBase ? `${repoBase}/public/images/` : null
 ].filter(Boolean))];
 
+function optimizedImageFile(path) {
+  return path.replace(/\.png$/i, '.webp');
+}
+
 function img(path) {
-  return `${IMAGE_BASES[0]}${path}`;
+  return `${IMAGE_BASES[0]}${optimizedImageFile(path)}`;
 }
 
 function installImageFallbacks() {
   document.addEventListener('error', event => {
     const el = event.target;
     if (!(el instanceof HTMLImageElement)) return;
-    const file = el.dataset.imageFile || (el.getAttribute('src') || '').split('/').pop();
+    const originalFile = el.dataset.imageFile || (el.getAttribute('src') || '').split('/').pop();
+    if (!originalFile) return;
+
+    const optimizedFile = optimizedImageFile(originalFile);
+    const candidates = [
+      ...IMAGE_BASES.map(base => `${base}${optimizedFile}`),
+      ...IMAGE_BASES.map(base => `${base}${originalFile}`)
+    ];
     const nextIndex = Number(el.dataset.fallbackIndex || 0) + 1;
-    if (!file || nextIndex >= IMAGE_BASES.length) {
+
+    if (nextIndex >= candidates.length) {
       el.style.display = 'none';
       const holder = el.closest('.team-logo');
       if (holder) holder.textContent = (el.alt || '?').slice(0, 2).toUpperCase();
       return;
     }
-    el.dataset.imageFile = file;
+    el.dataset.imageFile = originalFile;
     el.dataset.fallbackIndex = String(nextIndex);
-    el.src = `${IMAGE_BASES[nextIndex]}${file}`;
+    el.src = candidates[nextIndex];
   }, true);
 }
 

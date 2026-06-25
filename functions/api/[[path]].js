@@ -28,6 +28,8 @@ async function readBody(request) {
   }
 }
 
+let schemaReady = false;
+
 function requireDB(env) {
   if (!env.DB) throw new Error('D1 binding missing. Add a D1 binding named DB in Cloudflare Pages settings.');
   return env.DB;
@@ -35,6 +37,7 @@ function requireDB(env) {
 
 async function ensureSchema(env) {
   const db = requireDB(env);
+  if (schemaReady) return db;
   await db.prepare(`
     CREATE TABLE IF NOT EXISTS kv (
       key TEXT PRIMARY KEY,
@@ -42,6 +45,7 @@ async function ensureSchema(env) {
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `).run();
+  schemaReady = true;
   return db;
 }
 

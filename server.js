@@ -17,12 +17,19 @@ const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
 // ─────────── Middleware ───────────
 app.use(express.json({ limit: '64kb' }));
-app.use(express.static(PUBLIC_DIR));
+const staticOptions = {
+  etag: true,
+  maxAge: '1d',
+  setHeaders(res, filePath) {
+    if (/\.(html)$/i.test(filePath)) res.setHeader('Cache-Control', 'no-cache');
+  }
+};
+app.use(express.static(PUBLIC_DIR, staticOptions));
 // Also expose public assets under common static-preview prefixes so images/CSS
 // still load if the app is opened from /public/ or /Match-Schedule/.
-app.use('/public', express.static(PUBLIC_DIR));
-app.use('/Match-Schedule', express.static(PUBLIC_DIR));
-app.use('/Match-Schedule/public', express.static(PUBLIC_DIR));
+app.use('/public', express.static(PUBLIC_DIR, staticOptions));
+app.use('/Match-Schedule', express.static(PUBLIC_DIR, staticOptions));
+app.use('/Match-Schedule/public', express.static(PUBLIC_DIR, staticOptions));
 
 // ─────────── Data helpers ───────────
 function readData() {

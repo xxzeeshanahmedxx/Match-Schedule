@@ -24,10 +24,14 @@ const IMAGE_BASES = [...new Set([
   repoBase ? `${repoBase}/public/images/` : null
 ].filter(Boolean))];
 
+function optimizedImageFile(path) {
+  return path.replace(/\.png$/i, '.webp');
+}
+
 function img(path) {
-  // Start with the normal Express/static-public path. A global error handler below
-  // tries the other locations used by GitHub Pages/static previews if needed.
-  return `${IMAGE_BASES[0]}${path}`;
+  // Prefer tiny WebP avatars for speed; if unavailable, the global image error
+  // handler falls back to the original PNG stored in data-image-file.
+  return `${IMAGE_BASES[0]}${optimizedImageFile(path)}`;
 }
 
 function installImageFallbacks() {
@@ -35,13 +39,19 @@ function installImageFallbacks() {
     const el = event.target;
     if (!(el instanceof HTMLImageElement)) return;
 
-    const file = el.dataset.imageFile || (el.getAttribute('src') || '').split('/').pop();
-    if (!file) return;
+    const originalFile = el.dataset.imageFile || (el.getAttribute('src') || '').split('/').pop();
+    if (!originalFile) return;
 
+    const optimizedFile = optimizedImageFile(originalFile);
+    const candidates = [
+      ...IMAGE_BASES.map(base => `${base}${optimizedFile}`),
+      ...IMAGE_BASES.map(base => `${base}${originalFile}`)
+    ];
     const nextIndex = Number(el.dataset.fallbackIndex || 0) + 1;
-    if (nextIndex >= IMAGE_BASES.length) {
+
+    if (nextIndex >= candidates.length) {
       el.style.display = 'none';
-      const holder = el.closest('.player-logo, .team-logo, .mini-logo');
+      const holder = el.closest('.player-logo, .team-logo, .mini-logo, .featured-avatar');
       if (holder && !holder.dataset.fallbackText) {
         holder.dataset.fallbackText = (el.alt || '?').slice(0, 2).toUpperCase();
         holder.textContent = holder.dataset.fallbackText;
@@ -49,9 +59,9 @@ function installImageFallbacks() {
       return;
     }
 
-    el.dataset.imageFile = file;
+    el.dataset.imageFile = originalFile;
     el.dataset.fallbackIndex = String(nextIndex);
-    el.src = `${IMAGE_BASES[nextIndex]}${file}`;
+    el.src = candidates[nextIndex];
   }, true);
 }
 
@@ -197,13 +207,12 @@ async function fetchJsonCandidates(paths) {
 }
 
 async function loadFromApi() {
-  const [tRes, sRes] = await Promise.all([
-    fetch('/api/tournament', { cache: 'no-store' }),
-    fetch('/api/standings', { cache: 'no-store' })
-  ]);
-  if (!tRes.ok || !sRes.ok) throw new Error('API error');
+  // One request is enough: standings are deterministic from tournament data.
+  // This cuts API/D1 work in half on first load and every auto-refresh.
+  const tRes = await fetch('/api/tournament', { cache: 'no-store' });
+  if (!tRes.ok) throw new Error('API error');
   const tournament = await tRes.json();
-  const standings = await sRes.json();
+  const standings = calculateStandings(tournament);
   USING_STATIC_DATA = false;
   DATA = normalizeTournamentData(tournament, standings);
   STANDINGS = standings;
@@ -262,6 +271,10 @@ function renderHeader() {
       <strong>${m.value}</strong>
     </div>
   `).join('');
+
+  const pct = groupTotal ? Math.round((groupCompleted / groupTotal) * 100) : 0;
+  $('#progress-label').textContent = `${groupCompleted}/${groupTotal} · ${pct}%`;
+  $('#progress-fill').style.width = `${pct}%`;
 }
 
 function renderPlayers() {
@@ -430,6 +443,59 @@ function renderRules() {
   `).join('');
 }
 
+function matchSortValue(match) {
+  if (match.date && match.time) return new Date(`${match.date}T${match.time}`).getTime();
+  if (match.date) return new Date(`${match.date}T00:00:00`).getTime();
+  return Number.MAX_SAFE_INTEGER - (1000 - (match.order || 0));
+}
+
+function getFeaturedMatch() {
+  const live = DATA.matches.find(m => m.status === 'live');
+  if (live) return live;
+  return DATA.matches
+    .filter(m => m.status !== 'completed')
+    .slice()
+    .sort((a, b) => matchSortValue(a) - matchSortValue(b) || (a.order || 0) - (b.order || 0))[0] || null;
+}
+
+function renderFeaturedTeam(player, rank) {
+  if (!player) return `<div class="featured-team"><div class="featured-avatar">?</div><strong>${rank ? ordinal(rank) + ' Place' : 'TBD'}</strong></div>`;
+  return `
+    <div class="featured-team">
+      <div class="featured-avatar"><img src="${img(player.image)}" alt="${player.name}" data-image-file="${player.image}" loading="lazy" decoding="async" /></div>
+      <strong>${player.name}</strong>
+    </div>
+  `;
+}
+
+function renderNextUp() {
+  const match = getFeaturedMatch();
+  const section = $('#next-up-section');
+  if (!match) {
+    section.hidden = true;
+    return;
+  }
+
+  const p1 = playerById(match.player1);
+  const p2 = playerById(match.player2);
+  const stage = match.stage === 'group' ? 'Group Stage' : stageName(match.stage);
+  section.hidden = false;
+  $('#next-up').innerHTML = `
+    <div class="next-card ${match.status === 'live' ? 'is-live' : ''}">
+      <div class="next-meta">
+        <span class="status ${match.status}">${statusLabel(match.status)}</span>
+        <span>${stage} · ${match.label || 'Match ' + String(match.order || '').padStart(2, '0')}</span>
+      </div>
+      <div class="next-teams">
+        ${renderFeaturedTeam(p1, match.slot1Rank)}
+        <div class="next-vs">VS</div>
+        ${renderFeaturedTeam(p2, match.slot2Rank)}
+      </div>
+      <div class="next-time">📅 ${formatMatchDateTime(match)}</div>
+    </div>
+  `;
+}
+
 function renderStaticNotice() {
   const existing = $('#static-data-note');
   if (!USING_STATIC_DATA) {
@@ -447,6 +513,7 @@ function renderAll() {
   document.title = `${DATA.tournament.name} · 2026`;
   renderHeader();
   renderPlayers();
+  renderNextUp();
   renderStandings();
   renderSchedule();
   renderKnockout();
@@ -478,6 +545,7 @@ setInterval(async () => {
     await loadFromApi();
     if (DATA) {
       renderHeader();
+      renderNextUp();
       renderStandings();
       renderSchedule();
       renderKnockout();

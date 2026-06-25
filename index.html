@@ -4,6 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>RL Championship · 2026</title>
+<meta name="theme-color" content="#07070d" />
+<link rel="preload" href="style.css" as="style" />
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -15,7 +17,22 @@
     <div class="subtitle" id="subtitle">5 Players · 22 Matches · 1 Champion</div>
 
     <div class="meta-row" id="meta-row"></div>
+    <div class="progress-panel" aria-label="Group stage progress">
+      <div class="progress-top">
+        <span>Group Stage Progress</span>
+        <strong id="progress-label">0/20</strong>
+      </div>
+      <div class="progress-track"><span id="progress-fill"></span></div>
+    </div>
   </header>
+
+  <section class="next-up-section" id="next-up-section" hidden>
+    <div class="section-head compact">
+      <h2>Next Up</h2>
+      <span class="section-num">LIVE</span>
+    </div>
+    <div id="next-up"></div>
+  </section>
 
   <section>
     <div class="section-head">
@@ -83,6 +100,6 @@
   </footer>
 
 </div>
-<script src="app.js"></script>
+<script src="app.js" defer></script>
 </body>
 </html>
