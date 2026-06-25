@@ -11,7 +11,9 @@ let DATA = null;
 let STANDINGS = [];
 
 function img(path) {
-  return `/images/${path}`;
+  // Keep asset URLs relative so images work both at domain root and under a subpath
+  // such as GitHub Pages: /Match-Schedule/.
+  return `images/${path}`;
 }
 
 function playerById(id) {

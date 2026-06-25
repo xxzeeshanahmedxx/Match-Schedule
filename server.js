@@ -12,11 +12,15 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'rocket2026';
 const DATA_FILE = path.join(__dirname, 'data', 'tournament.json');
+const PUBLIC_DIR = path.join(__dirname, 'public');
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
 // ─────────── Middleware ───────────
 app.use(express.json({ limit: '64kb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(PUBLIC_DIR));
+// Also expose public assets under the repository name so images/CSS still load
+// if the app is previewed or proxied from /Match-Schedule/.
+app.use('/Match-Schedule', express.static(PUBLIC_DIR));
 
 // ─────────── Data helpers ───────────
 function readData() {
@@ -267,12 +271,16 @@ app.post('/api/reset', requireAdmin, (req, res) => {
 });
 
 // ─────────── SPA fallback ───────────
+app.get('/admin/', (req, res) => {
+  res.redirect(301, '/admin');
+});
+
 app.get('/admin', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+  res.sendFile(path.join(PUBLIC_DIR, 'admin.html'));
 });
 
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
 });
 
 // ─────────── Boot ───────────

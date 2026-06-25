@@ -9,7 +9,11 @@ const $$ = sel => document.querySelectorAll(sel);
 
 let DATA = null;
 
-function img(path) { return `/images/${path}`; }
+function img(path) {
+  // Keep asset URLs relative so images work both at domain root and under a subpath
+  // such as GitHub Pages: /Match-Schedule/.
+  return `images/${path}`;
+}
 function playerById(id) { return DATA.players.find(p => p.id === id) || null; }
 
 function getToken() { return localStorage.getItem(TOKEN_KEY); }
