@@ -38,6 +38,16 @@ npm start
 
 Default admin password is **`rocket2026`** — change it with the `ADMIN_PASSWORD` env var.
 
+## 📜 NPM Scripts
+
+| Script          | What it does                                              |
+|-----------------|-----------------------------------------------------------|
+| `npm start`     | Runs the Express server (production)                      |
+| `npm run dev`   | Runs with `--watch` for auto-restart on file changes      |
+| `npm run build` | No-op (echoes a message) — satisfies platforms that auto-run it before deploy |
+
+> **Note:** There's no real build step — the frontend is plain HTML/CSS/JS served as static files. Platforms like Render/Railway default to running `npm run build` before `npm start`; the no-op script just keeps them happy.
+
 ## 📁 Project Structure
 
 ```
