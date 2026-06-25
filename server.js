@@ -151,6 +151,35 @@ function resetKnockoutResults(data) {
   }
 }
 
+function hasOwn(obj, key) {
+  return Object.prototype.hasOwnProperty.call(obj || {}, key);
+}
+
+function normalizeDate(value) {
+  if (value === null || value === '') return null;
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new Error('Invalid date. Use YYYY-MM-DD.');
+  }
+  const d = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== value) {
+    throw new Error('Invalid calendar date.');
+  }
+  return value;
+}
+
+function normalizeTime(value) {
+  if (value === null || value === '') return null;
+  if (typeof value !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) {
+    throw new Error('Invalid time. Use HH:MM in 24-hour format.');
+  }
+  return value;
+}
+
+function applyScheduleFields(match, body) {
+  if (hasOwn(body, 'date')) match.date = normalizeDate(body.date);
+  if (hasOwn(body, 'time')) match.time = normalizeTime(body.time);
+}
+
 function extractBearer(req) {
   return (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
 }
@@ -223,34 +252,51 @@ app.put('/api/matches/:id', requireAdmin, (req, res) => {
   const match = data.matches.find(m => m.id === req.params.id);
   if (!match) return res.status(404).json({ error: 'Match not found' });
 
-  const { score1, score2, status } = req.body || {};
+  const body = req.body || {};
+  const { score1, score2, status } = body;
   const progress = groupProgress(data);
+  const hasScheduleUpdate = hasOwn(body, 'date') || hasOwn(body, 'time');
+  const hasResultOrStatusUpdate = hasOwn(body, 'score1') || hasOwn(body, 'score2') || hasOwn(body, 'status');
 
-  if (match.stage !== 'group' && !progress.complete) {
+  // Knockout players/results are locked until groups finish, but admins may still
+  // pre-schedule knockout dates/times before participants are known.
+  if (match.stage !== 'group' && !progress.complete && hasResultOrStatusUpdate) {
     return res.status(409).json({ error: 'Finish all group-stage matches before editing knockout results.' });
   }
 
-  if (status === 'reset' || (score1 === null && score2 === null && status === 'upcoming')) {
-    match.score1 = null;
-    match.score2 = null;
-    match.status = 'upcoming';
-  } else if (status === 'live') {
-    match.status = 'live';
-    if (score1 === null || score1 === undefined) match.score1 = null;
-    if (score2 === null || score2 === undefined) match.score2 = null;
-  } else {
-    if (!Number.isInteger(score1) || !Number.isInteger(score2) || score1 < 0 || score2 < 0) {
-      return res.status(400).json({ error: 'Invalid score. Use whole, non-negative numbers.' });
-    }
-
-    match.score1 = score1;
-    match.score2 = score2;
-    match.status = status && ['upcoming', 'live', 'completed'].includes(status) ? status : 'completed';
+  try {
+    if (hasScheduleUpdate) applyScheduleFields(match, body);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
   }
 
-  // Group results drive knockout slots. If a group match changes after knockouts
-  // were entered, clear knockout scores so old results are not attached to new seeds.
-  if (match.stage === 'group') resetKnockoutResults(data);
+  if (hasResultOrStatusUpdate) {
+    if (status === 'reset' || (score1 === null && score2 === null && status === 'upcoming')) {
+      match.score1 = null;
+      match.score2 = null;
+      match.status = 'upcoming';
+    } else if (status === 'live') {
+      match.status = 'live';
+      if (score1 === null || score1 === undefined) match.score1 = null;
+      if (score2 === null || score2 === undefined) match.score2 = null;
+    } else {
+      if (!Number.isInteger(score1) || !Number.isInteger(score2) || score1 < 0 || score2 < 0) {
+        return res.status(400).json({ error: 'Invalid score. Use whole, non-negative numbers.' });
+      }
+
+      match.score1 = score1;
+      match.score2 = score2;
+      match.status = status && ['upcoming', 'live', 'completed'].includes(status) ? status : 'completed';
+    }
+
+    // Group results drive knockout slots. If a group result changes after knockouts
+    // were entered, clear knockout scores so old results are not attached to new seeds.
+    if (match.stage === 'group') resetKnockoutResults(data);
+  }
+
+  if (!hasScheduleUpdate && !hasResultOrStatusUpdate) {
+    return res.status(400).json({ error: 'No match updates provided.' });
+  }
 
   writeData(data);
 

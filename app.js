@@ -88,6 +88,26 @@ function statusLabel(status) {
   return 'Upcoming';
 }
 
+function formatMatchDateTime(match) {
+  if (!match.date && !match.time) return 'Date/time TBD';
+
+  if (match.date && match.time) {
+    const d = new Date(`${match.date}T${match.time}`);
+    if (!Number.isNaN(d.getTime())) {
+      return d.toLocaleString('en-US', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+      });
+    }
+  }
+
+  if (match.date) return formatDate(match.date);
+  return `Time: ${match.time}`;
+}
+
 function hasScore(match) {
   return Number.isInteger(match.score1) && Number.isInteger(match.score2) && match.score1 >= 0 && match.score2 >= 0;
 }
@@ -285,6 +305,7 @@ function renderMatchCard(m, numLabel) {
           <div class="team-score ${score2Class}">${score2Text}</div>
         </div>
       </div>
+      <div class="match-time">📅 ${formatMatchDateTime(m)}</div>
       <div class="match-foot">
         <span>Group</span>
         <span class="status ${m.status}">${statusLabel(m.status)}</span>
@@ -371,6 +392,7 @@ function renderKnockoutStage(match) {
       <div class="stage-label">${isFinal ? 'Grand Prize' : 'Round 1 · 3rd/4th Place'}</div>
       <div class="stage-title">${isFinal ? '🏆 ' : ''}${stageName(match.stage).toUpperCase()}</div>
       <div class="stage-desc">${match.series || 'Best of 3'} · ${match.minutes || DATA.tournament.knockoutMinutes} min + ${match.extraTime || DATA.tournament.knockoutExtraTime} ET</div>
+      <div class="stage-time">📅 ${formatMatchDateTime(match)}</div>
       ${renderKnockoutSlot(match, 1)}
       <div class="knockout-versus">⚔</div>
       ${renderKnockoutSlot(match, 2)}

@@ -298,6 +298,17 @@ section { margin-top: 64px; }
   border-radius: 6px;
   flex-shrink: 0;
 }
+.match-time {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.03);
+  color: var(--silver);
+  font-size: 11px;
+  font-weight: 700;
+}
 .match-foot {
   display: flex;
   justify-content: space-between;
@@ -419,7 +430,20 @@ table.standings tr:hover td { background: rgba(168,85,255,0.04); }
 .knockout-stage .stage-desc {
   color: var(--muted);
   font-size: 13px;
-  margin-bottom: 20px;
+  margin-bottom: 10px;
+}
+.stage-time {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.04);
+  color: var(--silver);
+  font-size: 12px;
+  font-weight: 700;
 }
 .tbd-slot {
   padding: 14px;
@@ -751,9 +775,41 @@ footer.foot a {
   font-weight: 700;
   -moz-appearance: textfield;
 }
+.schedule-fields {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(160px, 1fr));
+  gap: 10px;
+  padding: 10px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.02);
+}
+.schedule-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--accent-2);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.schedule-fields input[type="date"],
+.schedule-fields input[type="time"] {
+  width: 100%;
+  padding: 9px 10px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--text);
+  color-scheme: dark;
+  font-size: 13px;
+}
 .match-edit input::-webkit-outer-spin-button,
 .match-edit input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.match-edit input:focus { outline: none; border-color: var(--accent); }
+.match-edit input:focus,
+.schedule-fields input:focus { outline: none; border-color: var(--accent); }
 .match-edit .actions {
   display: flex;
   flex-direction: column;
@@ -867,6 +923,9 @@ footer.foot a {
   }
   .match-edit .label { grid-column: 1 / -1; }
   .match-edit input[type="number"] { width: 100%; }
+  .schedule-fields { grid-template-columns: 1fr; gap: 8px; }
+  .match-edit .actions { justify-content: stretch !important; }
+  .match-edit .actions button { flex: 1 1 auto; }
 }
 
 @media (max-width: 380px) {

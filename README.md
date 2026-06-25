@@ -9,6 +9,7 @@ A full-stack tournament tracker for the **Rocket League Championship** with 5 pl
 - 📊 **Auto-calculated standings** — sorted by points → goal difference → goals scored → wins
 - 🏆 **Dynamic knockout** — top 2 advance to Final, 3rd & 4th to Semi Final/3rd-place match (locks after group stage)
 - 🔴 **Live match states** — admin can mark matches live, complete, or reset
+- 🗓 **Match scheduling** — admin can add or edit each match date and kickoff time
 - 📱 **Fully responsive** — works on phones, tablets, desktops
 - 💾 **Persistent storage** — results survive restarts (JSON file)
 - 🔄 **Auto-refresh** — public page polls every 30 s for live updates
@@ -38,6 +39,18 @@ npm start
 ```
 
 Default admin password is **`rocket2026`** — change it with the `ADMIN_PASSWORD` env var.
+
+Examples:
+
+```bash
+# macOS/Linux
+ADMIN_PASSWORD=myNewPassword npm start
+
+# Windows PowerShell
+$env:ADMIN_PASSWORD="myNewPassword"; npm start
+```
+
+On Render/Railway/Fly/etc., set `ADMIN_PASSWORD` in the service's Environment Variables / Secrets page, then redeploy or restart the service.
 
 ## 📜 NPM Scripts
 
@@ -87,7 +100,7 @@ match-schedule/
 |--------|----------------------------|-----------------------------------|
 | POST   | `/api/auth/login`          | `{ password }` → `{ token }`     |
 | POST   | `/api/auth/logout`         | Invalidate current token         |
-| PUT    | `/api/matches/:id`         | Set score, mark live, or reset a match |
+| PUT    | `/api/matches/:id`         | Set score, mark live, reset a match, or update `date` / `time` |
 | POST   | `/api/reset`               | Reset all match results          |
 
 ## 🏅 Tournament Format
