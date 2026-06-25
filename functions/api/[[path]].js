@@ -288,12 +288,13 @@ async function requireAdmin(request, env) {
 
 function ensureTournamentShape(data) {
   let changed = false;
-  if (!Array.isArray(data.gameModes) || data.gameModes.length === 0) {
+  // Keep existing D1 databases aligned with the currently playable/rotating list.
+  if (JSON.stringify(data.gameModes || []) !== JSON.stringify(DEFAULT_GAME_MODES)) {
     data.gameModes = DEFAULT_GAME_MODES;
     changed = true;
   }
   for (const match of data.matches || []) {
-    if (!hasOwn(match, 'gameMode')) {
+    if (!hasOwn(match, 'gameMode') || (match.gameMode && !DEFAULT_GAME_MODES.includes(match.gameMode))) {
       match.gameMode = null;
       changed = true;
     }

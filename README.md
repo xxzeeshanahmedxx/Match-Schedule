@@ -9,7 +9,7 @@ A full-stack tournament tracker for the **Rocket League Championship** with 5 pl
 - 📊 **Auto-calculated standings** — sorted by points → goal difference → goals scored → wins
 - 🏆 **Dynamic knockout** — top 2 advance to Final, 3rd & 4th to Semi Final/3rd-place match (locks after group stage)
 - 🔴 **Live match states** — admin can mark matches live, complete, or reset
-- 🗓 **Match scheduling** — admin can add or edit each match date, kickoff time, and game mode
+- 🗓 **Match scheduling** — admin can add/edit each match date, kickoff time, and currently playable/rotating game mode
 - 📱 **Mobile-first UI** — compact phone layout with two match cards per row
 - 💾 **Persistent storage** — local JSON for Express dev, Cloudflare D1 for Pages deployment
 - 🔄 **Auto-refresh** — public page polls every 30 s for live updates
