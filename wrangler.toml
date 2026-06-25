@@ -1,0 +1,10 @@
+name = "match-schedule"
+pages_build_output_dir = "public"
+compatibility_date = "2026-06-26"
+
+# After running `npx wrangler d1 create match-schedule-db`, replace the
+# database_id below with the ID Wrangler prints.
+[[d1_databases]]
+binding = "DB"
+database_name = "match-schedule-db"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"

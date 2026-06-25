@@ -6,13 +6,20 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "build": "echo '✅ No build step needed (vanilla JS / Express)'"
+    "build": "echo '✅ No build step needed (vanilla JS / Express)'",
+    "pages:dev": "wrangler pages dev public --d1 DB=match-schedule-db",
+    "pages:deploy": "wrangler pages deploy public",
+    "d1:migrate:local": "wrangler d1 migrations apply match-schedule-db --local",
+    "d1:migrate:remote": "wrangler d1 migrations apply match-schedule-db --remote"
   },
   "engines": {
     "node": ">=18.0.0"
   },
   "dependencies": {
     "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "wrangler": "^4.24.0"
   },
   "license": "MIT"
 }
