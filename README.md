@@ -109,7 +109,7 @@ match-schedule/
 |--------|----------------------------|-----------------------------------|
 | POST   | `/api/auth/login`          | `{ password }` → `{ token }`     |
 | POST   | `/api/auth/logout`         | Invalidate current token         |
-| PUT    | `/api/matches/:id`         | Set score, mark live, reset a match, or update `date` / `time` / `gameMode` |
+| PUT    | `/api/matches/:id`         | Set score, mark live, reset a match, or update `date` / `time` / custom `gameMode` |
 | POST   | `/api/reset`               | Reset all match results          |
 
 ## 🏅 Tournament Format

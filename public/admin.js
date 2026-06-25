@@ -88,13 +88,6 @@ function readMatchMetaFields(editor) {
   };
 }
 
-function gameModeOptions(selected) {
-  const modes = DATA.gameModes || [];
-  return ['<option value="">Mode TBD</option>', ...modes.map(mode => (
-    `<option value="${mode}" ${mode === selected ? 'selected' : ''}>${mode}</option>`
-  ))].join('');
-}
-
 async function api(path, opts = {}) {
   opts.headers = opts.headers || {};
   if (opts.body && typeof opts.body !== 'string') opts.body = JSON.stringify(opts.body);
@@ -220,7 +213,7 @@ function renderMatchEditor(m, numLabel) {
         </label>
         <label class="mode-label">
           <span>Game Mode</span>
-          <select data-field="gameMode">${gameModeOptions(matchMode)}</select>
+          <input type="text" data-field="gameMode" value="${matchMode}" placeholder="Mode TBD or custom mode" maxlength="48" />
         </label>
       </div>
 

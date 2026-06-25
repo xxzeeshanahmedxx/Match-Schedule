@@ -185,9 +185,10 @@ function normalizeTime(value) {
 function normalizeGameMode(value, data) {
   if (value === null || value === '') return null;
   if (typeof value !== 'string') throw new Error('Invalid game mode.');
-  const modes = data.gameModes || [];
-  if (!modes.includes(value)) throw new Error('Invalid game mode. Choose one of the allowed Rocket League modes.');
-  return value;
+  const cleaned = value.trim().replace(/\s+/g, ' ');
+  if (!cleaned) return null;
+  if (cleaned.length > 48) throw new Error('Game mode must be 48 characters or less.');
+  return cleaned;
 }
 
 function applyMatchMetaFields(match, body, data) {

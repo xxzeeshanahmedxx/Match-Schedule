@@ -200,9 +200,10 @@ function normalizeTime(value) {
 function normalizeGameMode(value, data) {
   if (value === null || value === '') return null;
   if (typeof value !== 'string') throw new Error('Invalid game mode.');
-  const modes = data.gameModes || [];
-  if (!modes.includes(value)) throw new Error('Invalid game mode. Choose one of the allowed Rocket League modes.');
-  return value;
+  const cleaned = value.trim().replace(/\s+/g, ' ');
+  if (!cleaned) return null;
+  if (cleaned.length > 48) throw new Error('Game mode must be 48 characters or less.');
+  return cleaned;
 }
 
 function applyMatchMetaFields(match, body, data) {
@@ -288,13 +289,12 @@ async function requireAdmin(request, env) {
 
 function ensureTournamentShape(data) {
   let changed = false;
-  // Keep existing D1 databases aligned with the currently playable/rotating list.
-  if (JSON.stringify(data.gameModes || []) !== JSON.stringify(DEFAULT_GAME_MODES)) {
+  if (!Array.isArray(data.gameModes)) {
     data.gameModes = DEFAULT_GAME_MODES;
     changed = true;
   }
   for (const match of data.matches || []) {
-    if (!hasOwn(match, 'gameMode') || (match.gameMode && !DEFAULT_GAME_MODES.includes(match.gameMode))) {
+    if (!hasOwn(match, 'gameMode')) {
       match.gameMode = null;
       changed = true;
     }

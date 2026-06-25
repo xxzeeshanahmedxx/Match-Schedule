@@ -1098,3 +1098,27 @@ table.standings tr:hover td { background: rgba(56,216,255,.045); }
   .match-edit { grid-template-columns: minmax(0, 1fr) 39px 39px minmax(0, 1fr); }
   .team-cell .name { max-width: 64px; }
 }
+
+/* Bottom reset zone */
+.admin-bottom-toolbar {
+  position: static;
+  margin: 22px 0 0;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+  backdrop-filter: none;
+}
+.admin-bottom-toolbar #reset-all {
+  margin-left: auto;
+  max-width: 240px;
+}
+@media (max-width: 640px) {
+  .admin-bottom-toolbar {
+    margin-top: 14px;
+    padding-top: 10px;
+  }
+  .admin-bottom-toolbar #reset-all {
+    max-width: none;
+    width: 100%;
+  }
+}
