@@ -153,13 +153,13 @@ async function doLogout() {
 
 // ───── Admin render ─────
 
-function renderTeamCell(player, rank, right = false) {
+function renderTeamCell(player, rank, right = false, fallbackLabel = '') {
   const direction = right ? ' right' : '';
   if (!player) {
     return `
       <div class="team-cell${direction} is-tbd">
         <div class="tbd-avatar">?</div>
-        <span class="name">${ordinal(rank)} Place</span>
+        <span class="name">${fallbackLabel || (rank ? ordinal(rank) + ' Place' : 'TBD')}</span>
       </div>
     `;
   }
@@ -180,27 +180,28 @@ function renderMatchEditor(m, numLabel) {
   const matchTime = m.time || '';
   const matchMode = m.gameMode || '';
   const status = m.status;
-  const locked = m.stage !== 'group' && !isGroupComplete();
+  const locked = m.stage !== 'group' && (!m.player1 || !m.player2);
   const disabled = locked ? 'disabled' : '';
+  const lockedMessage = m.stage === 'final' ? 'Finish both semi finals to unlock final scores' : 'Finish group stage to unlock semi-final scores';
   const stage = stageName(m.stage);
   const stageHint = m.stage === 'group'
     ? '10 min + 5 min ET'
     : `${m.series || 'Best of 3'} · ${m.minutes || 15} min + ${m.extraTime || 'unlimited'} ET`;
 
   return `
-    <div class="match-edit ${status} ${locked ? 'is-locked' : ''}" data-match-id="${m.id}" style="margin-bottom: 10px;">
+    <div class="match-edit ${status} ${locked ? 'is-locked' : ''}" data-match-id="${m.id}" data-stage="${m.stage}" style="margin-bottom: 10px;">
       <div class="label">
         ${numLabel} · ${stage} · <span style="text-transform: uppercase;">${status}</span>
         <small>${stageHint}</small>
       </div>
 
-      ${renderTeamCell(p1, m.slot1Rank, false)}
+      ${renderTeamCell(p1, m.slot1Rank, false, m.slot1Label)}
 
       <input type="number" min="0" step="1" inputmode="numeric" data-side="1" value="${s1}" placeholder="—" ${disabled} />
 
       <input type="number" min="0" step="1" inputmode="numeric" data-side="2" value="${s2}" placeholder="—" ${disabled} />
 
-      ${renderTeamCell(p2, m.slot2Rank, true)}
+      ${renderTeamCell(p2, m.slot2Rank, true, m.slot2Label)}
 
       <div class="schedule-fields">
         <label>
@@ -218,7 +219,7 @@ function renderMatchEditor(m, numLabel) {
       </div>
 
       <div class="actions" style="grid-column: 1 / -1; flex-direction: row; justify-content: flex-end; gap: 8px;">
-        ${locked ? '<span class="locked-note">Finish group stage to unlock scores</span>' : ''}
+        ${locked ? `<span class="locked-note">${lockedMessage}</span>` : ''}
         <button data-action="reset" ${disabled}>Reset</button>
         <button class="live" data-action="live" ${disabled}>Live</button>
         <button class="save" data-action="save" title="Save match details">💾 Save</button>
@@ -243,7 +244,7 @@ function renderMatches() {
   const groupTotal = DATA.meta?.groupTotal ?? group.length;
 
   const groupHtml = group.map((m, i) => renderMatchEditor(m, 'M' + String(i + 1).padStart(2, '0'))).join('');
-  const knockoutHtml = knockout.map((m, i) => renderMatchEditor(m, m.stage === 'final' ? 'FINAL' : 'SF')).join('');
+  const knockoutHtml = knockout.map((m, i) => renderMatchEditor(m, m.stage === 'final' ? 'FINAL' : `SF${i + 1}`)).join('');
 
   $('#match-list').innerHTML = `
     <div class="admin-section-title">
@@ -254,9 +255,9 @@ function renderMatches() {
 
     <div class="admin-section-title knockout-title">
       <h2>Knockout Stage</h2>
-      <span>${isGroupComplete() ? 'Unlocked' : 'Locked until group stage ends'}</span>
+      <span>${isGroupComplete() ? 'Semi finals unlocked' : 'Locked until group stage ends'}</span>
     </div>
-    ${!isGroupComplete() ? '<div class="admin-warning">Knockout participants are based on final standings and will be revealed once all group matches are completed.</div>' : ''}
+    ${!isGroupComplete() ? '<div class="admin-warning">Semi-final participants are based on final standings. The final unlocks after both semi finals are completed.</div>' : ''}
     ${knockoutHtml}
   `;
 }
@@ -270,7 +271,7 @@ async function saveMatch(matchId) {
 
   if (s1 !== '' || s2 !== '') {
     if (locked) {
-      alert('Finish all group-stage matches before saving knockout scores. You can still save date/time/mode.');
+      alert(editor.dataset.stage === 'final' ? 'Finish both semi finals before saving final scores. You can still save date/time/mode.' : 'Finish all group-stage matches before saving semi-final scores. You can still save date/time/mode.');
       return;
     }
     if (s1 === '' || s2 === '') {
@@ -301,7 +302,7 @@ async function saveMatch(matchId) {
 async function markLive(matchId) {
   const editor = document.querySelector(`[data-match-id="${matchId}"]`);
   if (editor?.classList.contains('is-locked')) {
-    alert('Finish all group-stage matches before editing knockout results.');
+    alert(editor.dataset.stage === 'final' ? 'Finish both semi finals before editing the final result.' : 'Finish all group-stage matches before editing semi-final results.');
     return;
   }
   try {

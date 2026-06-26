@@ -134,18 +134,46 @@ function calculateStandings(data) {
   });
 }
 
-function resolveMatchParticipants(match, standings, progress) {
+function getMatchWinnerId(match, standings, progress, data) {
+  if (!match || match.status !== 'completed' || !hasScore(match) || match.score1 === match.score2) return null;
+  const resolved = resolveMatchParticipants(match, standings, progress, data);
+  if (!resolved.player1 || !resolved.player2) return null;
+  return match.score1 > match.score2 ? resolved.player1 : resolved.player2;
+}
+
+function resolveSlot(match, side, standings, progress, data) {
+  const directPlayer = match[`player${side}`];
+  if (match.stage === 'group' || directPlayer) return directPlayer || null;
+  if (!progress.complete) return null;
+
+  const rank = match[`slot${side}Rank`];
+  if (rank) return standings[rank - 1]?.id || null;
+
+  const winnerOf = match[`slot${side}WinnerOf`];
+  if (winnerOf) {
+    const source = data.matches.find(item => item.id === winnerOf);
+    return getMatchWinnerId(source, standings, progress, data);
+  }
+
+  return null;
+}
+
+function resolveMatchParticipants(match, standings, progress, data) {
   if (match.stage === 'group') return { ...match };
 
-  const resolved = { ...match };
-  if (progress.complete) {
-    resolved.player1 = standings[(match.slot1Rank || 0) - 1]?.id || null;
-    resolved.player2 = standings[(match.slot2Rank || 0) - 1]?.id || null;
-  } else {
-    resolved.player1 = null;
-    resolved.player2 = null;
-  }
-  return resolved;
+  return {
+    ...match,
+    player1: resolveSlot(match, 1, standings, progress, data),
+    player2: resolveSlot(match, 2, standings, progress, data)
+  };
+}
+
+function hasResolvedParticipants(match, data) {
+  if (match.stage === 'group') return true;
+  const standings = calculateStandings(data);
+  const progress = groupProgress(data);
+  const resolved = resolveMatchParticipants(match, standings, progress, data);
+  return Boolean(resolved.player1 && resolved.player2);
 }
 
 function buildTournamentPayload(data) {
@@ -154,7 +182,7 @@ function buildTournamentPayload(data) {
 
   return {
     ...data,
-    matches: data.matches.map(m => resolveMatchParticipants(m, standings, progress)),
+    matches: data.matches.map(m => resolveMatchParticipants(m, standings, progress, data)),
     meta: {
       ...(data.meta || {}),
       groupCompleted: progress.completed,
@@ -167,6 +195,15 @@ function buildTournamentPayload(data) {
 function resetKnockoutResults(data) {
   for (const m of data.matches) {
     if (m.stage === 'group') continue;
+    m.score1 = null;
+    m.score2 = null;
+    m.status = 'upcoming';
+  }
+}
+
+function resetFinalResults(data) {
+  for (const m of data.matches) {
+    if (m.stage !== 'final') continue;
     m.score1 = null;
     m.score2 = null;
     m.status = 'upcoming';
@@ -293,6 +330,39 @@ function ensureTournamentShape(data) {
     data.gameModes = DEFAULT_GAME_MODES;
     changed = true;
   }
+
+  const currentById = new Map((data.matches || []).map(match => [match.id, match]));
+  const seedKnockouts = (INITIAL_TOURNAMENT.matches || []).filter(match => match.stage !== 'group');
+  const groupMatches = (data.matches || []).filter(match => match.stage === 'group');
+  const nextMatches = [...groupMatches];
+
+  for (const seed of seedKnockouts) {
+    const existing = currentById.get(seed.id) || {};
+    const bracketChanged = existing.stage !== seed.stage
+      || existing.order !== seed.order
+      || existing.slot1Rank !== seed.slot1Rank
+      || existing.slot2Rank !== seed.slot2Rank
+      || existing.slot1WinnerOf !== seed.slot1WinnerOf
+      || existing.slot2WinnerOf !== seed.slot2WinnerOf;
+
+    if (bracketChanged && existing.id) changed = true;
+
+    nextMatches.push({
+      ...seed,
+      date: existing.date ?? seed.date ?? null,
+      time: existing.time ?? seed.time ?? null,
+      gameMode: existing.gameMode ?? seed.gameMode ?? null,
+      score1: bracketChanged ? null : (existing.score1 ?? seed.score1 ?? null),
+      score2: bracketChanged ? null : (existing.score2 ?? seed.score2 ?? null),
+      status: bracketChanged ? 'upcoming' : (existing.status ?? seed.status ?? 'upcoming')
+    });
+  }
+
+  const normalizedIds = nextMatches.map(match => match.id).join('|');
+  const currentIds = (data.matches || []).map(match => match.id).join('|');
+  if (normalizedIds !== currentIds) changed = true;
+  data.matches = nextMatches.sort((a, b) => (a.order || 0) - (b.order || 0));
+
   for (const match of data.matches || []) {
     if (!hasOwn(match, 'gameMode')) {
       match.gameMode = null;
@@ -371,8 +441,11 @@ async function handleUpdateMatch(request, env, matchId) {
   const hasMetaUpdate = hasOwn(body, 'date') || hasOwn(body, 'time') || hasOwn(body, 'gameMode');
   const hasResultOrStatusUpdate = hasOwn(body, 'score1') || hasOwn(body, 'score2') || hasOwn(body, 'status');
 
-  if (match.stage !== 'group' && !progress.complete && hasResultOrStatusUpdate) {
-    return json({ error: 'Finish all group-stage matches before editing knockout results.' }, 409);
+  if (match.stage !== 'group' && hasResultOrStatusUpdate && !hasResolvedParticipants(match, data)) {
+    const message = match.stage === 'final'
+      ? 'Finish both semi finals before editing the final result.'
+      : 'Finish all group-stage matches before editing semi-final results.';
+    return json({ error: message }, 409);
   }
 
   try {
@@ -401,6 +474,7 @@ async function handleUpdateMatch(request, env, matchId) {
     }
 
     if (match.stage === 'group') resetKnockoutResults(data);
+    if (match.stage === 'semifinal') resetFinalResults(data);
   }
 
   if (!hasMetaUpdate && !hasResultOrStatusUpdate) {
@@ -411,7 +485,7 @@ async function handleUpdateMatch(request, env, matchId) {
 
   const standings = calculateStandings(data);
   const nextProgress = groupProgress(data);
-  return json(resolveMatchParticipants(match, standings, nextProgress));
+  return json(resolveMatchParticipants(match, standings, nextProgress, data));
 }
 
 async function handleReset(request, env) {

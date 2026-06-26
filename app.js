@@ -168,23 +168,39 @@ function groupProgress(data) {
   return { completed, total: group.length, complete: group.length > 0 && completed === group.length };
 }
 
+function getMatchWinnerId(match, standings, progress, data) {
+  if (!match || match.status !== 'completed' || !hasScore(match) || match.score1 === match.score2) return null;
+  const resolved = resolveMatchParticipants(match, standings, progress, data);
+  if (!resolved.player1 || !resolved.player2) return null;
+  return match.score1 > match.score2 ? resolved.player1 : resolved.player2;
+}
+
+function resolveSlot(match, side, standings, progress, data) {
+  const directPlayer = match[`player${side}`];
+  if (match.stage === 'group' || directPlayer) return directPlayer || null;
+  if (!progress.complete) return null;
+  const rank = match[`slot${side}Rank`];
+  if (rank) return standings[rank - 1]?.id || null;
+  const winnerOf = match[`slot${side}WinnerOf`];
+  if (winnerOf) return getMatchWinnerId(data.matches.find(item => item.id === winnerOf), standings, progress, data);
+  return null;
+}
+
+function resolveMatchParticipants(match, standings, progress, data) {
+  if (match.stage === 'group') return { ...match };
+  return {
+    ...match,
+    player1: resolveSlot(match, 1, standings, progress, data),
+    player2: resolveSlot(match, 2, standings, progress, data)
+  };
+}
+
 function normalizeTournamentData(rawData, standings = null) {
   const data = JSON.parse(JSON.stringify(rawData));
   const ranked = standings || calculateStandings(data);
   const progress = groupProgress(data);
 
-  data.matches = data.matches.map(match => {
-    if (match.stage === 'group') return match;
-    const resolved = { ...match };
-    if (progress.complete) {
-      resolved.player1 = ranked[(match.slot1Rank || 0) - 1]?.id || null;
-      resolved.player2 = ranked[(match.slot2Rank || 0) - 1]?.id || null;
-    } else {
-      resolved.player1 = null;
-      resolved.player2 = null;
-    }
-    return resolved;
-  });
+  data.matches = data.matches.map(match => resolveMatchParticipants(match, ranked, progress, data));
 
   data.meta = {
     ...(data.meta || {}),
@@ -381,6 +397,7 @@ function renderKnockoutSlot(match, side) {
   const isFirst = side === 1;
   const player = playerById(isFirst ? match.player1 : match.player2);
   const rank = isFirst ? match.slot1Rank : match.slot2Rank;
+  const slotLabel = isFirst ? match.slot1Label : match.slot2Label;
   const score = isFirst ? match.score1 : match.score2;
   const oppScore = isFirst ? match.score2 : match.score1;
   const done = match.status === 'completed' && score != null && oppScore != null;
@@ -389,7 +406,7 @@ function renderKnockoutSlot(match, side) {
   if (!player) {
     return `
       <div class="tbd-slot">
-        <span style="font-family: inherit;">${ordinal(rank)} Place</span>
+        <span style="font-family: inherit;">${slotLabel || (rank ? ordinal(rank) + ' Place' : 'TBD')}</span>
         <span class="slot-score">—</span>
       </div>
     `;
@@ -413,7 +430,7 @@ function renderKnockoutStage(match) {
 
   return `
     <div class="knockout-stage ${isFinal ? 'final-stage' : ''}">
-      <div class="stage-label">${isFinal ? 'Grand Prize' : 'Round 1 · 3rd/4th Place'}</div>
+      <div class="stage-label">${isFinal ? 'Grand Final' : (match.label || 'Semi Final')}</div>
       <div class="stage-title">${isFinal ? '🏆 ' : ''}${stageName(match.stage).toUpperCase()}</div>
       <div class="stage-desc">${match.series || 'Best of 3'} · ${match.minutes || DATA.tournament.knockoutMinutes} min + ${match.extraTime || DATA.tournament.knockoutExtraTime} ET</div>
       <div class="stage-time">📅 ${formatMatchDateTime(match)} · 🎮 ${formatGameMode(match)}</div>
@@ -421,7 +438,7 @@ function renderKnockoutStage(match) {
       <div class="knockout-versus">⚔</div>
       ${renderKnockoutSlot(match, 2)}
       <div class="match-foot knockout-foot">
-        <span>${isGroupComplete() ? 'Slots locked' : 'Revealed after group stage'}</span>
+        <span>${match.player1 && match.player2 ? 'Slots locked' : (isFinal ? 'Winners of semi finals' : 'Revealed after group stage')}</span>
         <span class="status ${match.status}">${statusLabel(match.status)}</span>
       </div>
       ${winner && isFinal ? `<div class="champion-banner">Champion: ${winner.name}</div>` : ''}
@@ -436,10 +453,17 @@ function renderKnockout() {
     return;
   }
 
-  $('#knockout').innerHTML = matches.map((m, i) => `
-    ${i > 0 ? '<div class="connector">→</div>' : ''}
-    ${renderKnockoutStage(m)}
-  `).join('');
+  const semiFinals = matches.filter(m => m.stage === 'semifinal');
+  const final = matches.find(m => m.stage === 'final');
+  $('#knockout').innerHTML = `
+    <div class="knockout-column semi-column">
+      ${semiFinals.map(renderKnockoutStage).join('')}
+    </div>
+    <div class="connector">→</div>
+    <div class="knockout-column final-column">
+      ${final ? renderKnockoutStage(final) : '<div class="empty-note">Final not scheduled yet.</div>'}
+    </div>
+  `;
 }
 
 function renderRules() {
@@ -469,8 +493,8 @@ function getFeaturedMatch() {
     .sort((a, b) => matchSortValue(a) - matchSortValue(b) || (a.order || 0) - (b.order || 0))[0] || null;
 }
 
-function renderFeaturedTeam(player, rank) {
-  if (!player) return `<div class="featured-team"><div class="featured-avatar">?</div><strong>${rank ? ordinal(rank) + ' Place' : 'TBD'}</strong></div>`;
+function renderFeaturedTeam(player, rank, fallbackLabel = 'TBD') {
+  if (!player) return `<div class="featured-team"><div class="featured-avatar">?</div><strong>${fallbackLabel || (rank ? ordinal(rank) + ' Place' : 'TBD')}</strong></div>`;
   return `
     <div class="featured-team">
       <div class="featured-avatar"><img src="${img(player.image)}" alt="${player.name}" data-image-file="${player.image}" loading="lazy" decoding="async" /></div>
@@ -498,9 +522,9 @@ function renderNextUp() {
         <span>${stage} · ${match.label || 'Match ' + String(match.order || '').padStart(2, '0')}</span>
       </div>
       <div class="next-teams">
-        ${renderFeaturedTeam(p1, match.slot1Rank)}
+        ${renderFeaturedTeam(p1, match.slot1Rank, match.slot1Label)}
         <div class="next-vs">VS</div>
-        ${renderFeaturedTeam(p2, match.slot2Rank)}
+        ${renderFeaturedTeam(p2, match.slot2Rank, match.slot2Label)}
       </div>
       <div class="next-time">📅 ${formatMatchDateTime(match)} · 🎮 ${formatGameMode(match)}</div>
     </div>

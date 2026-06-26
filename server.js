@@ -114,23 +114,46 @@ function calculateStandings(data) {
   });
 }
 
-function resolveMatchParticipants(match, standings, progress) {
-  if (match.stage === 'group') return { ...match };
+function getMatchWinnerId(match, standings, progress, data) {
+  if (!match || match.status !== 'completed' || !hasScore(match) || match.score1 === match.score2) return null;
+  const resolved = resolveMatchParticipants(match, standings, progress, data);
+  if (!resolved.player1 || !resolved.player2) return null;
+  return match.score1 > match.score2 ? resolved.player1 : resolved.player2;
+}
 
-  const resolved = { ...match };
+function resolveSlot(match, side, standings, progress, data) {
+  const directPlayer = match[`player${side}`];
+  if (match.stage === 'group' || directPlayer) return directPlayer || null;
+  if (!progress.complete) return null;
 
-  // Knockout slots are ranking-based and only lock once the group stage is complete.
-  if (progress.complete) {
-    const p1 = standings[(match.slot1Rank || 0) - 1];
-    const p2 = standings[(match.slot2Rank || 0) - 1];
-    resolved.player1 = p1 ? p1.id : null;
-    resolved.player2 = p2 ? p2.id : null;
-  } else {
-    resolved.player1 = null;
-    resolved.player2 = null;
+  const rank = match[`slot${side}Rank`];
+  if (rank) return standings[rank - 1]?.id || null;
+
+  const winnerOf = match[`slot${side}WinnerOf`];
+  if (winnerOf) {
+    const source = data.matches.find(item => item.id === winnerOf);
+    return getMatchWinnerId(source, standings, progress, data);
   }
 
-  return resolved;
+  return null;
+}
+
+function resolveMatchParticipants(match, standings, progress, data) {
+  if (match.stage === 'group') return { ...match };
+
+  return {
+    ...match,
+    player1: resolveSlot(match, 1, standings, progress, data),
+    player2: resolveSlot(match, 2, standings, progress, data)
+  };
+}
+
+function hasResolvedParticipants(match, data) {
+  if (match.stage === 'group') return true;
+  const standings = calculateStandings(data);
+  const progress = groupProgress(data);
+  const resolved = resolveMatchParticipants(match, standings, progress, data);
+  return Boolean(resolved.player1 && resolved.player2);
 }
 
 function buildTournamentPayload(data) {
@@ -139,7 +162,7 @@ function buildTournamentPayload(data) {
 
   return {
     ...data,
-    matches: data.matches.map(m => resolveMatchParticipants(m, standings, progress)),
+    matches: data.matches.map(m => resolveMatchParticipants(m, standings, progress, data)),
     meta: {
       ...(data.meta || {}),
       groupCompleted: progress.completed,
@@ -152,6 +175,15 @@ function buildTournamentPayload(data) {
 function resetKnockoutResults(data) {
   for (const m of data.matches) {
     if (m.stage === 'group') continue;
+    m.score1 = null;
+    m.score2 = null;
+    m.status = 'upcoming';
+  }
+}
+
+function resetFinalResults(data) {
+  for (const m of data.matches) {
+    if (m.stage !== 'final') continue;
     m.score1 = null;
     m.score2 = null;
     m.status = 'upcoming';
@@ -285,10 +317,13 @@ app.put('/api/matches/:id', requireAdmin, (req, res) => {
   const hasMetaUpdate = hasOwn(body, 'date') || hasOwn(body, 'time') || hasOwn(body, 'gameMode');
   const hasResultOrStatusUpdate = hasOwn(body, 'score1') || hasOwn(body, 'score2') || hasOwn(body, 'status');
 
-  // Knockout players/results are locked until groups finish, but admins may still
-  // pre-schedule knockout date/time/mode before participants are known.
-  if (match.stage !== 'group' && !progress.complete && hasResultOrStatusUpdate) {
-    return res.status(409).json({ error: 'Finish all group-stage matches before editing knockout results.' });
+  // Knockout results are locked until both participants are resolved.
+  // Semi finals resolve from group standings; final resolves from semi-final winners.
+  if (match.stage !== 'group' && hasResultOrStatusUpdate && !hasResolvedParticipants(match, data)) {
+    const message = match.stage === 'final'
+      ? 'Finish both semi finals before editing the final result.'
+      : 'Finish all group-stage matches before editing semi-final results.';
+    return res.status(409).json({ error: message });
   }
 
   try {
@@ -316,9 +351,10 @@ app.put('/api/matches/:id', requireAdmin, (req, res) => {
       match.status = status && ['upcoming', 'live', 'completed'].includes(status) ? status : 'completed';
     }
 
-    // Group results drive knockout slots. If a group result changes after knockouts
-    // were entered, clear knockout scores so old results are not attached to new seeds.
+    // Earlier bracket results drive later slots. Clear dependent results when needed
+    // so stale finalists/champions are not attached to new seeds.
     if (match.stage === 'group') resetKnockoutResults(data);
+    if (match.stage === 'semifinal') resetFinalResults(data);
   }
 
   if (!hasMetaUpdate && !hasResultOrStatusUpdate) {
@@ -329,7 +365,7 @@ app.put('/api/matches/:id', requireAdmin, (req, res) => {
 
   const standings = calculateStandings(data);
   const nextProgress = groupProgress(data);
-  res.json(resolveMatchParticipants(match, standings, nextProgress));
+  res.json(resolveMatchParticipants(match, standings, nextProgress, data));
 });
 
 // POST /api/reset — reset all match results (keeps schedule)
