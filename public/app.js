@@ -130,12 +130,17 @@ function scheduledAtMs(match) {
   return Number.isNaN(value) ? null : value;
 }
 
+function autoLiveWindowMs(match) {
+  if (match?.stage === 'group') return 20 * 60 * 1000;
+  return 3 * 60 * 60 * 1000;
+}
+
 function getEffectiveStatus(match, now = Date.now()) {
   if (!match) return 'upcoming';
-  if (match.status === 'completed' || match.status === 'live') return match.status;
+  if (match.status === 'completed') return 'completed';
   const startsAt = scheduledAtMs(match);
-  if (startsAt != null && now >= startsAt - AUTO_LIVE_LEAD_MS) return 'live';
-  return match.status || 'upcoming';
+  if (startsAt != null && now >= startsAt - AUTO_LIVE_LEAD_MS && now <= startsAt + autoLiveWindowMs(match)) return 'live';
+  return 'upcoming';
 }
 
 function hasScore(match) {

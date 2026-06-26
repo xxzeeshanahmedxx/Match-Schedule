@@ -221,7 +221,6 @@ function renderMatchEditor(m, numLabel) {
       <div class="actions" style="grid-column: 1 / -1; flex-direction: row; justify-content: flex-end; gap: 8px;">
         ${locked ? `<span class="locked-note">${lockedMessage}</span>` : ''}
         <button data-action="reset" ${disabled}>Reset</button>
-        <button class="live" data-action="live" ${disabled}>Live</button>
         <button class="save" data-action="save" title="Save match details">💾 Save</button>
       </div>
     </div>
@@ -299,25 +298,6 @@ async function saveMatch(matchId) {
   }
 }
 
-async function markLive(matchId) {
-  const editor = document.querySelector(`[data-match-id="${matchId}"]`);
-  if (editor?.classList.contains('is-locked')) {
-    alert(editor.dataset.stage === 'final' ? 'Finish both semi finals before editing the final result.' : 'Finish all group-stage matches before editing semi-final results.');
-    return;
-  }
-  try {
-    const updated = await api(`/api/matches/${matchId}`, {
-      method: 'PUT',
-      body: { status: 'live', ...readMatchMetaFields(editor) }
-    });
-    const idx = DATA.matches.findIndex(m => m.id === matchId);
-    if (idx >= 0) DATA.matches[idx] = updated;
-    await loadAdmin();
-  } catch (e) {
-    alert('Mark live failed: ' + e.message);
-  }
-}
-
 async function resetMatch(matchId) {
   if (!confirm('Clear the result for this match?')) return;
   try {
@@ -353,7 +333,6 @@ document.addEventListener('click', e => {
     if (!id) return;
     if (btn.dataset.action === 'save') saveMatch(id);
     if (btn.dataset.action === 'reset') resetMatch(id);
-    if (btn.dataset.action === 'live') markLive(id);
     return;
   }
 });

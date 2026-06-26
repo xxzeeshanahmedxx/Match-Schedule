@@ -58,27 +58,28 @@ function getMatchLabel(match) {
   return match.label || `Match ${String(match.order || '').padStart(2, '0')}`;
 }
 
-function getEffectiveStatus(match, now = Date.now()) {
-  if (!match) return 'upcoming';
-  if (match.status === 'completed' || match.status === 'live') return match.status;
-  const startsAt = scheduledAtMs(match);
-  if (startsAt != null && now >= startsAt - AUTO_LIVE_LEAD_MS) return 'live';
-  return match.status || 'upcoming';
+function autoLiveWindowMs(match) {
+  if (match?.stage === 'group') return 20 * 60 * 1000;
+  return 3 * 60 * 60 * 1000;
 }
 
-function validateChronologicalSchedule(data) {
-  const scheduled = (data.matches || [])
-    .slice()
-    .sort((a, b) => (a.order || 0) - (b.order || 0))
-    .map(match => ({ match, startsAt: scheduledAtMs(match) }))
-    .filter(item => item.startsAt != null);
+function getEffectiveStatus(match, now = Date.now()) {
+  if (!match) return 'upcoming';
+  if (match.status === 'completed') return 'completed';
+  const startsAt = scheduledAtMs(match);
+  if (startsAt != null && now >= startsAt - AUTO_LIVE_LEAD_MS && now <= startsAt + autoLiveWindowMs(match)) return 'live';
+  return 'upcoming';
+}
 
-  let previous = null;
-  for (const item of scheduled) {
-    if (previous && item.startsAt < previous.startsAt) {
-      return `${getMatchLabel(item.match)} cannot be scheduled before ${getMatchLabel(previous.match)}.`;
-    }
-    previous = item;
+function validateMatchSchedule(data, changedMatch) {
+  const startsAt = scheduledAtMs(changedMatch);
+  if (startsAt == null) return '';
+  const previous = (data.matches || [])
+    .filter(match => (match.order || 0) < (changedMatch.order || 0) && scheduledAtMs(match) != null)
+    .sort((a, b) => (b.order || 0) - (a.order || 0))[0];
+
+  if (previous && startsAt < scheduledAtMs(previous)) {
+    return `${getMatchLabel(changedMatch)} cannot be scheduled before ${getMatchLabel(previous)}.`;
   }
   return '';
 }
@@ -373,7 +374,7 @@ app.put('/api/matches/:id', requireAdmin, (req, res) => {
   }
 
   if (hasMetaUpdate) {
-    const scheduleError = validateChronologicalSchedule(data);
+    const scheduleError = validateMatchSchedule(data, match);
     if (scheduleError) return res.status(400).json({ error: scheduleError });
   }
 
