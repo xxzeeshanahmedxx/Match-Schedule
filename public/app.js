@@ -122,6 +122,22 @@ function formatMatchDateTime(match) {
   return `Time: ${match.time}`;
 }
 
+const AUTO_LIVE_LEAD_MS = 10 * 60 * 1000;
+
+function scheduledAtMs(match) {
+  if (!match?.date || !match?.time) return null;
+  const value = new Date(`${match.date}T${match.time}:00+05:00`).getTime();
+  return Number.isNaN(value) ? null : value;
+}
+
+function getEffectiveStatus(match, now = Date.now()) {
+  if (!match) return 'upcoming';
+  if (match.status === 'completed' || match.status === 'live') return match.status;
+  const startsAt = scheduledAtMs(match);
+  if (startsAt != null && now >= startsAt - AUTO_LIVE_LEAD_MS) return 'live';
+  return match.status || 'upcoming';
+}
+
 function hasScore(match) {
   return Number.isInteger(match.score1) && Number.isInteger(match.score2) && match.score1 >= 0 && match.score2 >= 0;
 }
@@ -200,7 +216,10 @@ function normalizeTournamentData(rawData, standings = null) {
   const ranked = standings || calculateStandings(data);
   const progress = groupProgress(data);
 
-  data.matches = data.matches.map(match => resolveMatchParticipants(match, ranked, progress, data));
+  data.matches = data.matches.map(match => {
+    const resolved = resolveMatchParticipants(match, ranked, progress, data);
+    return { ...resolved, status: getEffectiveStatus(resolved) };
+  });
 
   data.meta = {
     ...(data.meta || {}),

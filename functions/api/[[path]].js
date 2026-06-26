@@ -67,6 +67,43 @@ async function putKV(env, key, value) {
   `).bind(key, JSON.stringify(value)).run();
 }
 
+const AUTO_LIVE_LEAD_MS = 10 * 60 * 1000;
+
+function scheduledAtMs(match) {
+  if (!match?.date || !match?.time) return null;
+  const value = new Date(`${match.date}T${match.time}:00+05:00`).getTime();
+  return Number.isNaN(value) ? null : value;
+}
+
+function getMatchLabel(match) {
+  return match.label || `Match ${String(match.order || '').padStart(2, '0')}`;
+}
+
+function getEffectiveStatus(match, now = Date.now()) {
+  if (!match) return 'upcoming';
+  if (match.status === 'completed' || match.status === 'live') return match.status;
+  const startsAt = scheduledAtMs(match);
+  if (startsAt != null && now >= startsAt - AUTO_LIVE_LEAD_MS) return 'live';
+  return match.status || 'upcoming';
+}
+
+function validateChronologicalSchedule(data) {
+  const scheduled = (data.matches || [])
+    .slice()
+    .sort((a, b) => (a.order || 0) - (b.order || 0))
+    .map(match => ({ match, startsAt: scheduledAtMs(match) }))
+    .filter(item => item.startsAt != null);
+
+  let previous = null;
+  for (const item of scheduled) {
+    if (previous && item.startsAt < previous.startsAt) {
+      return `${getMatchLabel(item.match)} cannot be scheduled before ${getMatchLabel(previous.match)}.`;
+    }
+    previous = item;
+  }
+  return '';
+}
+
 function hasScore(match) {
   return Number.isInteger(match.score1) && Number.isInteger(match.score2) && match.score1 >= 0 && match.score2 >= 0;
 }
@@ -182,7 +219,10 @@ function buildTournamentPayload(data) {
 
   return {
     ...data,
-    matches: data.matches.map(m => resolveMatchParticipants(m, standings, progress, data)),
+    matches: data.matches.map(m => {
+      const resolved = resolveMatchParticipants(m, standings, progress, data);
+      return { ...resolved, status: getEffectiveStatus(resolved) };
+    }),
     meta: {
       ...(data.meta || {}),
       groupCompleted: progress.completed,
@@ -454,6 +494,11 @@ async function handleUpdateMatch(request, env, matchId) {
     return json({ error: err.message }, 400);
   }
 
+  if (hasMetaUpdate) {
+    const scheduleError = validateChronologicalSchedule(data);
+    if (scheduleError) return json({ error: scheduleError }, 400);
+  }
+
   if (hasResultOrStatusUpdate) {
     if (status === 'reset' || (score1 === null && score2 === null && status === 'upcoming')) {
       match.score1 = null;
@@ -485,7 +530,10 @@ async function handleUpdateMatch(request, env, matchId) {
 
   const standings = calculateStandings(data);
   const nextProgress = groupProgress(data);
-  return json(resolveMatchParticipants(match, standings, nextProgress, data));
+  {
+    const resolved = resolveMatchParticipants(match, standings, nextProgress, data);
+    return json({ ...resolved, status: getEffectiveStatus(resolved) });
+  }
 }
 
 async function handleReset(request, env) {
